@@ -13,6 +13,8 @@ cc_library(
         "@nlohmann//:json",
         "@sole",
     ],
+    strip_include_prefix = "src",
+    include_prefix = "common"
 )
 
 cc_test(

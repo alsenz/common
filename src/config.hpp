@@ -4,7 +4,7 @@
 
 #include "caf/actor_system_config.hpp"
 
-#include "logger.hpp"
+#include "common/logger.hpp"
 
 namespace as {
 

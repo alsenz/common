@@ -6,8 +6,8 @@
 
 #include "caf/all.hpp"
 
-#include "logger.hpp"
-#include "throwaway-action.hpp"
+#include "common/logger.hpp"
+#include "common/throwaway-action.hpp"
 
 // This is so close to caf functionality, we're just going to hijack the namespace a bit
 namespace caf {

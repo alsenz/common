@@ -1,4 +1,4 @@
-#include "version.hpp"
+#include "common/version.hpp"
 
 namespace as::common {
 
