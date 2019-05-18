@@ -9,7 +9,7 @@
 #include "caf/all.hpp"
 #include "caf/io/all.hpp"
 
-#include "src/common/config.hpp"
+#include "src/config.hpp"
 
 struct test_config {
     std::string hostname = "localhost";
