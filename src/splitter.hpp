@@ -7,13 +7,6 @@
 
 #include "caf/all.hpp"
 
-//TODO remove this once I've written the class up!
-#include "external/libcaf/_virtual_includes/libcaf_core/caf/actor_cast.hpp"
-#include "external/libcaf/_virtual_includes/libcaf_core/caf/error.hpp"
-#include "external/libcaf/_virtual_includes/libcaf_core/caf/response_promise.hpp"
-#include "external/libcaf/_virtual_includes/libcaf_core/caf/unit.hpp"
-#include "external/libcaf/_virtual_includes/libcaf_core/caf/local_actor.hpp"
-#include "external/libcaf/_virtual_includes/libcaf_core/caf/duration.hpp"
 
 namespace as::common {
 
