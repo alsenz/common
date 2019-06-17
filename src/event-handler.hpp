@@ -7,7 +7,7 @@
 #include "caf/all.hpp"
 
 #include "common/logger.hpp"
-#include "common/throwaway-action.hpp"
+#include "common/throwaway-event.hpp"
 
 // This is so close to caf functionality, we're just going to hijack the namespace a bit
 namespace caf {
@@ -15,14 +15,14 @@ namespace caf {
 
     namespace detail {
 
-        template<typename Action>
-        using action_sig = std::conditional_t<
-            std::is_void_v<typename Action::result_t>,
-            typename caf::reacts_to<Action>,
-            typename caf::replies_to<Action>::template with<typename Action::result_t>>;
+        template<typename Event>
+        using event_sig = std::conditional_t<
+            std::is_void_v<typename Event::result_t>,
+            typename caf::reacts_to<Event>,
+            typename caf::replies_to<Event>::template with<typename Event::result_t>>;
 
-        template<typename... Actions>
-        using action_typed_actor = typed_actor<action_sig<Actions>...>;
+        template<typename... Events>
+        using event_typed_actor = typed_actor<event_sig<Events>...>;
 
         template<typename T>
         struct behaviors_to_handler;
@@ -33,8 +33,8 @@ namespace caf {
             auto operator()(T *thiz) {
                 return [thiz](Is... args) -> caf::result<O> {
                     std::stringstream ss;
-                    ss << "Handling action with result. This type: " << typeid(T).name() << ", result type: " << typeid(O).name() << ", args tuple: " << typeid(std::tuple<Is...>).name();
-                    as::common::logger::trace_a(thiz, ss.str(), "action-handler", __FUNCTION__, __LINE__, __FILE__);
+                    ss << "Handling event with result. This type: " << typeid(T).name() << ", result type: " << typeid(O).name() << ", args tuple: " << typeid(std::tuple<Is...>).name();
+                    as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
                     return thiz->handle(std::forward<Is>(args)...);
                 };
             }
@@ -46,8 +46,8 @@ namespace caf {
             auto operator()(T *thiz) {
                 return [thiz](Is... args) -> void {
                     std::stringstream ss;
-                    ss << "Handling action with no result (void)! This type: " << typeid(T).name() << ", args tuple: " << typeid(std::tuple<Is...>).name();
-                    as::common::logger::trace_a(thiz, ss.str(), "action-handler", __FUNCTION__, __LINE__, __FILE__);
+                    ss << "Handling event with no result (void)! This type: " << typeid(T).name() << ", args tuple: " << typeid(std::tuple<Is...>).name();
+                    as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
                     thiz->handle(std::forward<Is>(args)...);
                 };
             }
@@ -62,10 +62,10 @@ namespace caf {
             auto operator()(T *thiz) {
                 return [thiz](Is... args) -> void {
                     std::stringstream ss;
-                    ss << "Handling throwaway action. This type: " << typeid(T).name() << ", args tuple: " << typeid(std::tuple<Is...>).name();
-                    as::common::logger::trace_a(thiz, ss.str(), "action-handler", __FUNCTION__, __LINE__, __FILE__);
-                    // Basically call the handle on the base action type for the throw away wrapper.
-                    thiz->handle(((const typename Is::base_action_t &) args)...);
+                    ss << "Handling throwaway event. This type: " << typeid(T).name() << ", args tuple: " << typeid(std::tuple<Is...>).name();
+                    as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
+                    // Basically call the handle on the base event type for the throw away wrapper.
+                    thiz->handle(((const typename Is::base_event_t &) args)...);
                 };
             }
         };
@@ -73,27 +73,27 @@ namespace caf {
     } // ns detail
 
 
-    // An action handler is a statically typed actor that has a "handle" method for each Action. Action must be a struct with a typedef called result_t, with a result type
-    // each handle method must exist for each action and have the signature caf::result<Action::result_t> handle(Action)!
+    // An event handler is a statically typed actor that has a "handle" method for each Event. Event must be a struct with a typedef called result_t, with a result type
+    // each handle method must exist for each event and have the signature caf::result<Event::result_t> handle(Event)!
 
-    // The action handler pattern has the advantage that 1) there is no need to manually call make_behavior() (with the wrong spelling!) and
+    // The event handler pattern has the advantage that 1) there is no need to manually call make_behavior() (with the wrong spelling!) and
     // 2) the method signatures are a darn-sight clearer and more obvious.
 
     // As with most cases of actor design, no effort it made to support inheritance.
 
-    // Finally, each action has a throw_away action variant, which is a special type wrapper that causes the action to be handled as before, but ignores the result.
+    // Finally, each event has a throw_away event variant, which is a special type wrapper that causes the event to be handled as before, but ignores the result.
 
-    template<typename Derived, typename... Actions>
-    class action_handler : public detail::action_typed_actor<Actions..., throw_away_action_t<Actions>...>::base {
+    template<typename Derived, typename... Events>
+    class event_handler : public detail::event_typed_actor<Events..., throw_away_event_t<Events>...>::base {
 
     public:
 
-        using super = typename detail::action_typed_actor<Actions..., throw_away_action_t<Actions>...>::base;
+        using super = typename detail::event_typed_actor<Events..., throw_away_event_t<Events>...>::base;
 
         template<typename SingleClause>
         friend class detail::behaviors_to_handler;
 
-        action_handler(caf::actor_config &cfg) : super(cfg) {}
+        event_handler(caf::actor_config &cfg) : super(cfg) {}
 
         // This basically just eliminates the boiler plate for make_behavior, and the spelling.
         typename super::behavior_type make_behavior() override {
@@ -103,7 +103,7 @@ namespace caf {
                 ss << ", name: " << self_ptr->name();
                 ss << ", derived type: " << typeid(Derived).name();
                 ss << "]: " << msg.content().stringify();
-                LOG_ERROR_A("action-handler", ss.str());
+                LOG_ERROR_A("event-handler", ss.str());
                 on_unexpected_message(msg);
                 return sec::unexpected_message;
             });
@@ -114,7 +114,7 @@ namespace caf {
                 ss << ", name: " << self_ptr->name();
                 ss << ", derived type: " << typeid(Derived).name();
                 ss << "]: " << to_string(msg);
-                LOG_WARN_A("action-handler", ss.str());
+                LOG_WARN_A("event-handler", ss.str());
                 on_down_msg(msg);
             });
 
@@ -127,13 +127,13 @@ namespace caf {
                     ss << ", reason: " << this->system().render(msg.reason);
                 }
                 ss << "]: " << to_string(msg);
-                LOG_WARN_A("action-handler", ss.str());
+                LOG_WARN_A("event-handler", ss.str());
                 on_exit(msg);
             });
 
             return {
-                detail::behaviors_to_throw_away_handler<detail::action_sig<throw_away_action_t<Actions>>>()(static_cast<Derived *>(this))...,
-                detail::behaviors_to_handler<detail::action_sig<Actions>>()(static_cast<Derived *>(this))...
+                detail::behaviors_to_throw_away_handler<detail::event_sig<throw_away_event_t<Events>>>()(static_cast<Derived *>(this))...,
+                detail::behaviors_to_handler<detail::event_sig<Events>>()(static_cast<Derived *>(this))...
             };
         }
 
