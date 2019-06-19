@@ -31,4 +31,5 @@ cc_test(
         "@nlohmann//:json",
         "@sole",
     ],
+    visibility = ["//visibility:public"],
 )
