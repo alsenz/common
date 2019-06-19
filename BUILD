@@ -33,3 +33,20 @@ cc_test(
     ],
     visibility = ["//visibility:public"],
 )
+
+
+cc_library(
+    name = "lib-tests",
+    srcs = glob(["tests/*.cpp"]),
+    copts = [
+        "-std=c++17",
+        "-Wno-write-strings",
+    ],
+    linkopts = ["-lstdc++fs"],
+    deps = [
+        ":common",
+        "@nlohmann//:json",
+        "@sole",
+    ],
+    visibility = ["//visibility:public"],
+)
