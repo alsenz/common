@@ -45,6 +45,7 @@ cc_library(
     linkopts = ["-lstdc++fs"],
     deps = [
         ":common",
+        "@gtest//:gtest_main",
         "@nlohmann//:json",
         "@sole",
     ],
