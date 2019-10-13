@@ -34,12 +34,15 @@ namespace as {
             return std::get<Config>(_config_variants);
         }
 
-        actor_system_config& parse(int argc, char** argv,
+        caf::error parse(int argc, char** argv,
                                    const char* ini_file_cstr = nullptr) {
-            caf::actor_system_config::parse(argc, argv, ini_file_cstr);
+            auto err = caf::actor_system_config::parse(argc, argv, ini_file_cstr);
+            if(err) {
+                return err;
+            }
             // Inject the same verbosity into our own logger.
             common::logger::set_verbosity(caf::get<caf::atom_value>(*this, "logger.verbosity"));
-            return *this;
+            return {};
         }
 
     private:
