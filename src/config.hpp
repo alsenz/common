@@ -1,6 +1,7 @@
 #pragma once
 
 #include <tuple>
+#include <string>
 
 #include "caf/actor_system_config.hpp"
 
@@ -16,11 +17,12 @@ namespace as {
     public:
 
         config() {
-            // Change some defaults to be more sensible! (//TODO: sort out deprecation here... what is long term plan with logging in caf?)
-            logger_file_format = "%d [%t %a] %p %c (%M) %F:%L %m%n";
-            logger_console_format = logger_file_format;
-            logger_console = caf::atom("coloured");
-            logger_verbosity = caf::atom("info");
+            // Change some defaults to be more appropriate
+            const std::string dflt_log = "%d [%t %a] %p %c (%M) %F:%L %m%n";
+            set("logger.file-format", dflt_log);
+            set("logger.console-format", dflt_log);
+            set("logger.console", caf::atom("coloured"));
+            set("logger.verbosity", caf::atom("info"));
             if constexpr(sizeof...(Configurables) > 0) {
                 apply_custom_options<Configurables...>(caf::actor_system_config::custom_options_);
             }
@@ -36,7 +38,7 @@ namespace as {
                                    const char* ini_file_cstr = nullptr) {
             caf::actor_system_config::parse(argc, argv, ini_file_cstr);
             // Inject the same verbosity into our own logger.
-            common::logger::set_verbosity(logger_verbosity);
+            common::logger::set_verbosity(caf::get<caf::atom_value>(*this, "logger.verbosity"));
             return *this;
         }
 

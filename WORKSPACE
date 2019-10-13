@@ -28,6 +28,6 @@ http_archive(
 http_archive(
     name = "libcaf",
     build_file = "@//external:libcaf.BUILD",
-    strip_prefix = "actor-framework-0.16.3",
-    urls = ["https://github.com/actor-framework/actor-framework/archive/0.16.3.tar.gz"],
+    strip_prefix = "actor-framework-0.17.1",
+    urls = ["https://github.com/actor-framework/actor-framework/archive/0.17.1.tar.gz"],
 )
