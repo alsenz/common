@@ -8,6 +8,7 @@
 
 #include "common/logger.hpp"
 #include "common/throwaway-event.hpp"
+#include "common/virtual-handler.hpp"
 
 // This is so close to caf functionality, we're just going to hijack the namespace a bit
 namespace caf {
@@ -83,8 +84,8 @@ namespace caf {
 
     // Finally, each event has a throw_away event variant, which is a special type wrapper that causes the event to be handled as before, but ignores the result.
 
-    template<typename Derived, typename... Events>
-    class event_handler : public detail::event_typed_actor<Events..., throw_away_event_t<Events>...>::base {
+    template<typename... Events>
+    class event_handler : public detail::event_typed_actor<Events..., throw_away_event_t<Events>...>::base, virtual_handler_base<Events...> {
 
     public:
 
@@ -101,7 +102,6 @@ namespace caf {
                 std::stringstream ss;
                 ss << "Unexpected message [receiver id: " << self_ptr->id();
                 ss << ", name: " << self_ptr->name();
-                ss << ", derived type: " << typeid(Derived).name();
                 ss << "]: " << msg.content().stringify();
                 LOG_ERROR_A("event-handler", ss.str());
                 on_unexpected_message(msg);
@@ -112,7 +112,6 @@ namespace caf {
                 std::stringstream ss;
                 ss << "Handler going down [id: " << self_ptr->id();
                 ss << ", name: " << self_ptr->name();
-                ss << ", derived type: " << typeid(Derived).name();
                 ss << "]: " << to_string(msg);
                 LOG_WARN_A("event-handler", ss.str());
                 on_down_msg(msg);
@@ -122,7 +121,6 @@ namespace caf {
                 std::stringstream ss;
                 ss << "Received exit message [id: " << self_ptr->id();
                 ss << ", name: " << self_ptr->name();
-                ss << ", derived type: " << typeid(Derived).name();
                 if(msg.reason) {
                     ss << ", reason: " << this->system().render(msg.reason);
                 }
@@ -132,8 +130,8 @@ namespace caf {
             });
 
             return {
-                detail::behaviors_to_throw_away_handler<detail::event_sig<throw_away_event_t<Events>>>()(static_cast<Derived *>(this))...,
-                detail::behaviors_to_handler<detail::event_sig<Events>>()(static_cast<Derived *>(this))...
+                detail::behaviors_to_throw_away_handler<detail::event_sig<throw_away_event_t<Events>>>()(this)...,
+                detail::behaviors_to_handler<detail::event_sig<Events>>()(this)...
             };
         }
 
