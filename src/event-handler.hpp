@@ -85,7 +85,7 @@ namespace caf {
     // Finally, each event has a throw_away event variant, which is a special type wrapper that causes the event to be handled as before, but ignores the result.
 
     template<typename... Events>
-    class event_handler : public detail::event_typed_actor<Events..., throw_away_event_t<Events>...>::base, as::virtual_handler_base<Events...> {
+    class event_handler : public detail::event_typed_actor<Events..., throw_away_event_t<Events>...>::base, public as::virtual_handler_base<Events...> {
 
     public:
 
