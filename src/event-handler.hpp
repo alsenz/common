@@ -29,50 +29,53 @@ namespace caf {
         struct behaviors_to_handler;
 
         template<typename O, typename... Is>
-        struct behaviors_to_handler<typed_mpi < detail::type_list<Is...>, output_tuple <O>>> {
-            template<typename T>
-            auto operator()(T *thiz) {
-                return [thiz](Is... args) -> caf::result<O> {
-                    std::stringstream ss;
-                    ss << "Handling event with result. This type: " << typeid(T).name() << ", result type: " << typeid(O).name() << ", args tuple: " << typeid(std::tuple<Is...>).name();
-                    as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
-                    return thiz->handle(std::forward<Is>(args)...);
-                };
-            }
-        };
-
-        template<typename... Is>
-        struct behaviors_to_handler<typed_mpi<detail::type_list<Is...>, output_tuple<void>>> {
-            template<typename T>
-            auto operator()(T *thiz) {
-                return [thiz](Is... args) -> void {
-                    std::stringstream ss;
-                    ss << "Handling event with no result (void)! This type: " << typeid(T).name() << ", args tuple: " << typeid(std::tuple<Is...>).name();
-                    as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
-                    thiz->handle(std::forward<Is>(args)...);
-                };
-            }
-        };
-
+        struct behaviors_to_handler<typed_mpi < detail::type_list<Is...>, output_tuple < O>>> {
         template<typename T>
-        struct behaviors_to_throw_away_handler;
+        auto operator()(T *thiz) {
+            return [thiz](Is... args) -> caf::result<O> {
+                std::stringstream ss;
+                ss << "Handling event with result. This type: " << typeid(T).name() << ", result type: "
+                   << typeid(O).name() << ", args tuple: " << typeid(std::tuple<Is...>).name();
+                as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
+                return thiz->handle(std::forward<Is>(args)...);
+            };
+        }
+    };
 
-        template<typename... Is>
-        struct behaviors_to_throw_away_handler<typed_mpi<detail::type_list<Is...>, output_tuple<void>>> {
-            template<typename T>
-            auto operator()(T *thiz) {
-                return [thiz](Is... args) -> void {
-                    std::stringstream ss;
-                    ss << "Handling throwaway event. This type: " << typeid(T).name() << ", args tuple: " << typeid(std::tuple<Is...>).name();
-                    as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
-                    // Basically call the handle on the base event type for the throw away wrapper.
-                    thiz->handle(((const typename Is::base_event_t &) args)...);
-                };
-            }
+    template<typename... Is>
+    struct behaviors_to_handler<typed_mpi < detail::type_list<Is...>, output_tuple < void>>> {
+    template<typename T>
+    auto operator()(T *thiz) {
+        return [thiz](Is... args) -> void {
+            std::stringstream ss;
+            ss << "Handling event with no result (void)! This type: " << typeid(T).name() << ", args tuple: "
+               << typeid(std::tuple<Is...>).name();
+            as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
+            thiz->handle(std::forward<Is>(args)...);
         };
+    }
+};
 
-    } // ns detail
+template<typename T>
+struct behaviors_to_throw_away_handler;
 
+template<typename... Is>
+struct behaviors_to_throw_away_handler<typed_mpi < detail::type_list < Is...>, output_tuple<void>>> {
+template<typename T>
+auto operator()(T *thiz) {
+    return [thiz](Is... args) -> void {
+        std::stringstream ss;
+        ss << "Handling throwaway event. This type: " << typeid(T).name() << ", args tuple: "
+           << typeid(std::tuple<Is...>).name();
+        as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
+        // Basically call the handle on the base event type for the throw away wrapper.
+        thiz->handle(((const typename Is::base_event_t &) args)...);
+    };
+}
+
+};
+
+} // ns detail
 
     // An event handler is a statically typed actor that has a "handle" method for each Event. Event must be a struct with a typedef called result_t, with a result type
     // each handle method must exist for each event and have the signature caf::result<Event::result_t> handle(Event)!
