@@ -5,13 +5,18 @@
 #include <functional>
 #include <algorithm>
 #include <optional>
+#include <chrono>
+#include <stdexcept>
 
 #include "caf/all.hpp"
 
 namespace as::common {
 
+    //TODO we should be able to get rid of ClzActor: 1) we need request, 2) we need system() for spawn...
 
-    template<typename ClzActor, typename T, typename O = T>
+    //TODO refactor this further for further simplification by using polymorphism on shared_ptr's instead of having to override as much...
+
+    template<typename T, typename O = T>
     struct splitter_state {
 
         // Reducers manipulate state in-place, and optionally return a caf::error if something has gone wrong.
@@ -20,16 +25,22 @@ namespace as::common {
         using error_reducer_t = std::function<caf::error(const caf::error &)>;
 
         // Reducer both reduces and returns the continue predicate for quorum based reductions, also takes latch as an argument.
-        splitter_state(uint64_t latch, const T &init, reducer_t reducer, error_reducer_t error_reducer = {}) //By default we have no error reducer
-        : _latch(latch), _fired(false), _data(init), _reducer(reducer), _error_reducer(error_reducer) {}
+        template<class ClzActor>
+        splitter_state(ClzActor *, uint64_t latch, const T &init, reducer_t reducer, error_reducer_t error_reducer) //By default we have no error reducer
+        : _fired(false), _data(init), _latch(latch), _reducer(reducer), _error_reducer(error_reducer) {
+            if(!_reducer || !_error_reducer) {
+                throw std::logic_error("In splitter, reducer or error_reducer not set!");
+            }
+        }
 
         bool _fired; //Guards _data from being destroyed when moved out, also prevents result_hdlr from firing multiple times.
         T _data;
-        std::function<void(T &&)> _result_hdlr;
-        std::function<void(const caf::error &)> _err_hdlr;
         std::size_t _latch;
         reducer_t _reducer;
         error_reducer_t  _error_reducer;
+
+        std::function<void(T &&)> _result_hdlr;
+        std::function<void(const caf::error &)> _err_hdlr;
 
         void hit(O &&reducible) {
             if(_fired) {
@@ -44,7 +55,10 @@ namespace as::common {
                 return;
             } else if(_latch == 0) {
                 _fired = true;
-                _result_hdlr(std::move(_data));
+                on_fire();
+                if(_result_hdlr) {
+                    _result_hdlr(std::move(_data));
+                }
             }
         }
 
@@ -61,45 +75,129 @@ namespace as::common {
                 return;
             }
             _fired = true;
-            _err_hdlr(err);
+            on_fire();
+            if(_err_hdlr) {
+                _err_hdlr(err);
+            }
+        }
+
+        // Used to test for secenarios where the latch is already 0 - i.e. size 0 spliter
+        void pre_hit() {
+            if(_latch == 0 && !_fired) {
+                _fired = true;
+                on_fire();
+                if(_result_hdlr) {
+                    _result_hdlr(std::move(_data));
+                }
+            }
+        }
+
+        virtual void on_fire() {
+            std::cout << "The virtual void on_fire...()" << std::endl;
+            //No-op default
         }
 
     };
 
+    template<typename T, typename O = T>
+    struct timeout_splitter_state : splitter_state<T, O> {
 
-    template<typename ClzActor, typename T, typename O = T, typename State = splitter_state<ClzActor, T, O>>
+        using timeout_atom = caf::atom_constant<caf::atom("spto")>;
+        using timeout_actor_t = caf::typed_actor<caf::reacts_to<timeout_atom>>;
+        using super = splitter_state<T, O>;
+
+        using reducer_t = typename splitter_state<T, O>::reducer_t;
+        using error_reducer_t = typename splitter_state<T, O>::error_reducer_t;
+        static constexpr int s_default_timeout = 100;
+
+        template<typename ClzActor>
+        timeout_splitter_state(ClzActor *thiz, uint64_t latch, const T &init, reducer_t reducer,
+            error_reducer_t error_reducer, const std::chrono::milliseconds &timeout = std::chrono::milliseconds(s_default_timeout))
+            : splitter_state<T, O>(thiz, latch, init, reducer, error_reducer) {
+            _timeout_actor = thiz->system().spawn([this, &timeout](timeout_actor_t::pointer self) -> timeout_actor_t::behavior_type {
+                self->delayed_send(self, timeout, timeout_atom::value);
+                return {
+                    [this](timeout_atom) {
+                        std::cout << "Going to hit_timeout...." << std::endl;
+                        this->fire_timeout();
+                    }
+                };
+            }); //Note: is spawning a new actor the simple way to hit a function on a delay? We could just have a pool of actors that hit functions...
+        }
+
+        virtual void on_fire() override {
+            std::cout << "TODO TODO TODO THIS ABSOLUTELY NEEDS TO FIRE AT LEAST ONCE...." << std::endl;
+            std::cout << "In on_fire..." << std::endl;
+            // Kill the timeout
+            caf::anon_send_exit(_timeout_actor, caf::exit_reason::kill);
+            std::cout << "Done in on_fire..." << std::endl;
+        }
+
+        // Used to fire with timeouts if necessary
+        void fire_timeout() {
+            if(!super::_fired) { // Need to fire an error
+                super::_fired = true;
+                std::cout << "... pre-A" << std::endl;
+                //TODO why are we not hitting the on_fire
+                //TODO this continues to be a bit mad... we continue to hit the virtual void which i just don't understand.... from within hit_timeout as well...
+                //on_fire(); //TODO do we hit on_fire here.... since it's actually a timeout and we DONT want to kill ourselves as an acotr...
+                std::cout << "::A" << std::endl;
+                if(super::_err_hdlr) {
+                    std::cout << "::B" << std::endl;
+                    //TODO so this is there but it's junk... TODO TODO let's find out why... TODO TODO next step!
+                    //TODO PUT THIS BACK IN.... and find out why we segfault after ::D as well!
+                    super::_err_hdlr(caf::make_error(caf::sec::request_timeout));
+                    std::cout << "::C" << std::endl;
+                }
+                std::cout << "::D" << std::endl;
+            }
+        }
+
+    private:
+
+        timeout_actor_t _timeout_actor;
+
+    };
+
+    template<typename ClzActor, typename T, typename O = T,  template<typename, typename> typename State = splitter_state>
     class splitter {
 
     public:
 
-        using reducer_t = typename splitter_state<ClzActor, T, O>::reducer_t;
+        using splitter_state_t = State<T, O>;
+        using reducer_t = typename splitter_state_t::reducer_t;
+        using error_reducer_t = typename splitter_state_t::error_reducer_t;
 
         static constexpr auto default_reducer = [](T &t, O &&o) -> caf::error {
             t += std::move(o);
             return {}; //No error
         };
 
+        static constexpr auto default_error_reducer = [](const caf::error &e) -> caf::error {
+            std::cout << "Firing default error reducer..." << std::endl;
+            return e;
+        };
+
         splitter(ClzActor *thiz, std::size_t split_size, const T &init = T(),
-            const reducer_t &reducer = default_reducer)
-            : _thiz(thiz) {
-            _impl = std::make_shared<State>(split_size, init, reducer);
-        }
+                 const reducer_t &reducer = default_reducer, const error_reducer_t &error_reducer = default_error_reducer)
+                 //Note: the contract with splitter state constructor is that it must *at least* have these arguments.
+                 : splitter(thiz, std::make_shared<splitter_state_t>(thiz, split_size, init, reducer, error_reducer)) {} //TODO add
 
     protected:
 
         //Separate constructor for state provided - should only be used when extendingss
-        splitter(ClzActor *thiz, std::shared_ptr<State> state) : _thiz(thiz) {
-            _impl = state;
-        }
+        splitter(ClzActor *thiz, std::shared_ptr<splitter_state_t> state)
+            : _thiz(thiz), _impl(state) {}
 
     public:
 
         void join(std::function<void(T &&)> result_handler, std::function<void(const caf::error &)> err_handler = {}) {
             _impl->_result_hdlr = result_handler;
             if(err_handler) {
+                std::cout << "Setting error handler..." << std::endl;
                 _impl->_err_hdlr = err_handler;
             }
-            _join_called = true;
+            _impl->pre_hit();
         }
 
         void join_to(caf::response_promise rp) {
@@ -107,7 +205,15 @@ namespace as::common {
                 rp.deliver(std::move(r));
             },
             [rp](const caf::error &err) mutable {
-                rp.deliver(err);
+                std::cout << "In 194 error handler... " << std::endl;
+                //TODO me feels that somehow rp is dead inside deliver... that's a bit worrying...
+                //TODO log this out or something?
+                std::cout << "Is response pending? " << std::endl;
+                std::cout << rp.pending() << std::endl;
+                std::cout << "Delivering error..." << std::endl;
+                caf::error err2;
+                rp.deliver(err2);
+                std::cout << "The other side of it..." << std::endl;
             });
         }
 
@@ -117,6 +223,7 @@ namespace as::common {
                      rp.deliver(transformer(std::move(r)));
                  },
                  [rp](const caf::error &err) mutable {
+                     std::cout << "In 206 error handler...." << std::endl;
                      rp.deliver(err);
                  });
         }
@@ -130,7 +237,7 @@ namespace as::common {
 
         template<class TargetActorHdl, typename... Args>
         void delegate(TargetActorHdl target, Args... args) {
-            //TODO: I've taken this out because i'm not sure it even is a race anymore
+            //TODO: I've taken this out because i'm not sure it even is a race anymore //TODO validate this
             //if (!_join_called) {
             //    throw std::logic_error("Race error: attempt to delegate without first calling join. This would result in a race.");
             //}
@@ -144,7 +251,7 @@ namespace as::common {
 
         template<class TargetActorHdl, typename R, typename... Args>
         void delegate_transform(TargetActorHdl target, std::function<O(R&&)> transformer, Args... args) {
-            //TODO I've taken this out because I'm not sure it even is a race anymore
+            //TODO I've taken this out because I'm not sure it even is a race anymore //TODO validate this
             //if (!_join_called) {
             //    throw std::logic_error("Race error: attempt to delegate without first calling join. This would result in a race.");
             //}
@@ -168,27 +275,48 @@ namespace as::common {
 
     protected:
 
-        std::shared_ptr<State> impl() {
+        std::shared_ptr<splitter_state_t> impl() {
             return _impl;
         }
 
     private:
 
         ClzActor *_thiz;
-        bool _join_called = false; //To prevent race conditions.
-        std::shared_ptr<State> _impl;
+        std::shared_ptr<splitter_state_t> _impl;
 
     };
 
     template<typename ClzActor, typename T, typename O = T>
-    struct quorum_splitter_state : splitter_state<ClzActor, T, O> {
+    struct timed_splitter : splitter<ClzActor, T, O, timeout_splitter_state> {
 
-        using super = splitter_state<ClzActor, T, O>;
+        using super = splitter<ClzActor, T, O, timeout_splitter_state>;
         using reducer_t = typename super::reducer_t;
         using error_reducer_t = typename super::error_reducer_t;
 
-        quorum_splitter_state(uint64_t latch, const T &init, std::size_t split_size, std::size_t quorum_size)
-            : splitter_state<ClzActor, T, O>(latch, init, {}/*default ct reducer*/), split_size(split_size), quorum_size(quorum_size), error_ct(0), success_ct(0) {}
+        timed_splitter(ClzActor *thiz, std::size_t split_size, const T &init = T(),
+                 const reducer_t &reducer = super::default_reducer, const std::chrono::milliseconds &timeout = std::chrono::milliseconds(0))
+        //Note: the contract with splitter state constructor is that it must *at least* have these arguments.
+            : super(thiz, std::make_shared<timeout_splitter_state<T, O>>(thiz, split_size, init, reducer, super::default_error_reducer, timeout)) {}
+
+        timed_splitter(ClzActor *thiz, std::size_t split_size, const T &init, const std::chrono::milliseconds &timeout)
+        //Note: the contract with splitter state constructor is that it must *at least* have these arguments.
+            : super(thiz, std::make_shared<timeout_splitter_state<T, O>>(thiz, split_size, init, super::default_reducer, super::default_error_reducer, timeout)) {}
+
+    };
+
+    template<typename T, typename O = T>
+    struct quorum_splitter_state : timeout_splitter_state<T, O> {
+
+        using super = timeout_splitter_state<T, O>;
+        using reducer_t = typename super::reducer_t;
+        using error_reducer_t = typename super::error_reducer_t;
+
+        template<class ClzActor>
+        quorum_splitter_state(ClzActor *thiz, uint64_t latch, const T &init, std::size_t quorum_size,
+            reducer_t reducer, error_reducer_t error_reducer = {}, const std::chrono::milliseconds &timeout_millis = std::chrono::milliseconds(super::s_default_timeout))
+            : super(thiz, latch, init, reducer, error_reducer, timeout_millis), split_size(split_size), quorum_size(quorum_size), error_ct(0), success_ct(0) {}
+
+    public:
 
         // We need to be able to lazily set the reducer so we can refer to the state itself!
         void set_reducer(const reducer_t &r_fn) {
@@ -206,23 +334,34 @@ namespace as::common {
 
     };
 
+    //TODO pick this up -- what's compiling again? TODO from here-- there's a segfault involving error handling...
+    //TODO fix this up-- tests including quorum tests...
+    //TODO back to raft! Really make some progress here!
+    //TODO TODO let's get compiling! TODO from here.... TODO yay let's actually pick this up now...
+
     //Quorum: just like splitter, but a count, a quorum, a reducer, a predicate to check...
     //Note that the reducer is only called *before* quorum is achieved......
     template<typename ClzActor, typename T, typename O = T>
-    class quorum_splitter : public splitter<ClzActor, T, O, quorum_splitter_state<ClzActor, T, O>> {
+    class quorum_splitter : public splitter<ClzActor, T, O, quorum_splitter_state> {
 
         public:
 
-        using state_t = quorum_splitter_state<ClzActor, T, O>;
+        using state_t = quorum_splitter_state<T, O>;
         using reducer_t = typename state_t::reducer_t;
+        using error_reducer_t = typename state_t::error_reducer_t ;
+        using super = splitter<ClzActor, T, O, quorum_splitter_state>;
+
+        static constexpr int s_default_timeout = 1000;
 
     private:
 
-        static std::shared_ptr<quorum_splitter_state<ClzActor, T, O>> make_quorum_state(const T &init, uint64_t latch, uint64_t quorum,
-            const reducer_t &reducer = splitter<ClzActor, T, O>::default_binary_reducer) {
+        static std::shared_ptr<quorum_splitter_state<T, O>> make_quorum_state(ClzActor *thiz, const T &init, uint64_t latch, uint64_t quorum,
+            const reducer_t &reducer = splitter<ClzActor, T, O>::default_binary_reducer,
+            const error_reducer_t &error_reducer = splitter<ClzActor, T, O>::default_error_reducer,
+            const std::chrono::milliseconds timeout_millis = std::chrono::milliseconds(s_default_timeout)) {
 
-            //quorum_splitter_state(uint64_t latch, const T &init, std::size_t split_size, std::size_t quorum_size)
-            auto q_state = std::make_shared<quorum_splitter_state<ClzActor, T, O>>();
+            // We set nullptr reducer and error reducer
+            auto q_state = std::make_shared<quorum_splitter_state<T, O>>(thiz, latch, init, quorum, nullptr, nullptr, timeout_millis);
             auto wrapped_reducer_fn = [q_state, reducer](T &t, O &&o) -> caf::error {
                 const auto err = reducer(t, std::move(o));
                 if(!err) {
@@ -240,23 +379,23 @@ namespace as::common {
                 }
             };
             q_state->set_reducer(wrapped_reducer_fn);
-            auto wrapped_error_reducer = [q_state](const caf::error &err) -> caf::error {
+            auto wrapped_error_reducer = [q_state, error_reducer](const caf::error &err) -> caf::error {
                 // Can quorum still be reached?
                 if(q_state->error_ct < (q_state->split_size - q_state->quorum_size)) {
                     return {}; //Wipe out the error
                 }
-                //TODO better error handling here.
-                return err; // Pass the error on - quorum can no longer be reached
+                return error_reducer(err); // Delegate back through to the error reducer.
             };
             q_state->set_error_reducer(wrapped_error_reducer);
         }
 
     public:
 
-            // Quorum splitters always have
             quorum_splitter(ClzActor *thiz, uint64_t split_size, std::size_t quorum_size, const T &init = T(),
-                     const reducer_t &reducer = splitter<ClzActor, T, O>::default_binary_reducer)
-                     : splitter<ClzActor, T, O, state_t>(make_quorum_state(init, split_size, quorum_size, reducer)) //TODO ctors for this... need a sharewd pointer option!
+                     const reducer_t &reducer = super::default_binary_reducer,
+                     const error_reducer_t &error_reducer = super::default_error_reducer,
+                     const std::chrono::milliseconds timeout_millis = std::chrono::milliseconds(s_default_timeout))
+                     : super(thiz, make_quorum_state(thiz, init, split_size, quorum_size, reducer, error_reducer, timeout_millis))
             {
                 if(quorum_size > split_size) {
                     throw std::logic_error("quorum_splitter: quorum greater than split size.");
@@ -308,11 +447,13 @@ namespace as::common {
 
     //Special type of splitter that merges together containers in sorted order.
     template<typename ClzActor, template<typename, class> class C, typename T, class A = std::allocator<T>>
-    class merger : public splitter<ClzActor, C<T, A>, C<T, A>> {
+    class merger : public splitter<ClzActor, C<T, A>, C<T, A>, splitter_state> {
 
     public:
+            using super = splitter<ClzActor, C<T, A>, C<T, A>, splitter_state>;
+
             merger(ClzActor *thiz, std::size_t split_size)
-            : splitter<ClzActor, C<T, A>, C<T, A>>(thiz, split_size, C<T, A>(), insert_merge) {}
+            : super(thiz, split_size, C<T, A>(), insert_merge) {}
     };
 
 } //ns as::common
