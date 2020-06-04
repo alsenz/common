@@ -2,6 +2,7 @@
 
 #include <tuple>
 #include <string>
+#include <stdexcept>
 
 #include "caf/actor_system_config.hpp"
 
@@ -19,10 +20,12 @@ namespace as {
         config() {
             // Change some defaults to be more appropriate
             const std::string dflt_log = "%d [%t %a] %p %c (%M) %F:%L %m%n";
+            const std::string dflt_colour = "coloured";
+            const std::string dflt_verbosity = "info";
             set("logger.file-format", dflt_log);
             set("logger.console-format", dflt_log);
-            set("logger.console", caf::atom("coloured"));
-            set("logger.verbosity", caf::atom("info"));
+            set("logger.console", dflt_colour);
+            set("logger.verbosity", dflt_verbosity);
             if constexpr(sizeof...(Configurables) > 0) {
                 apply_custom_options<Configurables...>(caf::actor_system_config::custom_options_);
             }
@@ -41,8 +44,19 @@ namespace as {
                 return err;
             }
             // Inject the same verbosity into our own logger.
-            common::logger::set_verbosity(caf::get<caf::atom_value>(*this, "logger.verbosity"));
+            common::logger::set_verbosity(caf::get<std::string>(*this, "logger.verbosity"));
             return {};
+        }
+
+        std::size_t positional_arg_count() const {
+            return caf::actor_system_config::remainder.size();
+        }
+
+        const std::string &positional_arg(std::size_t idx) const {
+            if(idx >= positional_arg_count()) {
+                throw std::logic_error("Config positional arg out of bounds.");
+            }
+            return caf::actor_system_config::remainder.at(idx);
         }
 
     private:

@@ -5,16 +5,19 @@ cc_library(
         "src/*.hpp",
         "src/nonstd/span.hpp",
     ]),
-    copts = ["-std=c++17"],
+    copts = [
+        "-std=c++17",
+        "-fconcepts",
+    ],
+    include_prefix = "common",
     linkopts = ["-lstdc++fs"],
+    strip_include_prefix = "src",
     visibility = ["//visibility:public"],
     deps = [
         "@libcaf",
         "@nlohmann//:json",
         "@sole",
     ],
-    strip_include_prefix = "src",
-    include_prefix = "common"
 )
 
 cc_test(
@@ -23,17 +26,17 @@ cc_test(
     copts = [
         "-std=c++17",
         "-Wno-write-strings",
+        "-fconcepts",
     ],
     linkopts = ["-lstdc++fs"],
+    visibility = ["//visibility:public"],
     deps = [
         ":common",
         "@gtest//:gtest_main",
         "@nlohmann//:json",
         "@sole",
     ],
-    visibility = ["//visibility:public"],
 )
-
 
 cc_library(
     name = "lib-tests",
@@ -41,13 +44,14 @@ cc_library(
     copts = [
         "-std=c++17",
         "-Wno-write-strings",
+        "-fconcepts",
     ],
     linkopts = ["-lstdc++fs"],
+    visibility = ["//visibility:public"],
     deps = [
         ":common",
         "@gtest//:gtest_main",
         "@nlohmann//:json",
         "@sole",
     ],
-    visibility = ["//visibility:public"],
 )

@@ -25,9 +25,11 @@ http_archive(
 )
 
 # Caf dependency
+# was 0.17.1
+# TODO update to tag as soon as 0.18 released!
 http_archive(
     name = "libcaf",
     build_file = "@//external:libcaf.BUILD",
-    strip_prefix = "actor-framework-0.17.1",
-    urls = ["https://github.com/actor-framework/actor-framework/archive/0.17.1.tar.gz"],
+    strip_prefix = "actor-framework-47ebe211f07d31725a3910ed966db1c31192d984",
+    urls = ["https://github.com/actor-framework/actor-framework/archive/47ebe211f07d31725a3910ed966db1c31192d984.tar.gz"],
 )

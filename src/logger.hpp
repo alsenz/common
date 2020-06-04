@@ -49,26 +49,21 @@ namespace as::common {
         static verbosity_t verbosity;
 
         //This is just manually set from the main function usually.
-        static void set_verbosity(caf::atom_value atm_v) {
-            switch (static_cast<uint64_t>(atm_v)) {
-                case static_cast<uint64_t>(caf::atom("trace")):
-                    logger::verbosity = verbosity_t::trace;
-                    break;
-                case static_cast<uint64_t>(caf::atom("debug")):
-                    logger::verbosity = verbosity_t::debug;
-                    break;
-                case static_cast<uint64_t>(caf::atom("info")):
-                    logger::verbosity = verbosity_t::info;
-                    break;
-                case static_cast<uint64_t>(caf::atom("warn")):
-                    logger::verbosity = verbosity_t::warn;
-                    break;
-                case static_cast<uint64_t>(caf::atom("error")):
-                    logger::verbosity = verbosity_t::error;
-                    break;
-                default:
-                case static_cast<uint64_t>(caf::atom("fatal")):
-                    logger::verbosity = verbosity_t::fatal;
+        static void set_verbosity(const std::string &verbosity) {
+            if(verbosity == "trace") {
+                logger::verbosity = verbosity_t::trace;
+            } else if(verbosity == "debug") {
+                logger::verbosity = verbosity_t::debug;
+            } else if(verbosity == "info") {
+                logger::verbosity = verbosity_t::info;
+            } else if(verbosity == "warn") {
+                logger::verbosity = verbosity_t::warn;
+            } else if(verbosity == "error") {
+                logger::verbosity = verbosity_t::error;
+            } else if(verbosity == "fatal") {
+                logger::verbosity = verbosity_t::fatal;
+            } else {
+                logger::verbosity = verbosity_t::warn;
             }
         }
 
