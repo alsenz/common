@@ -1,3 +1,4 @@
 bazel-*
 .idea
 .clwb
+nohup.out

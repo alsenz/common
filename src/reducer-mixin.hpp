@@ -5,6 +5,10 @@
 
 #include "common/reducer-policy.hpp"
 
+//Note this is based on:
+//https://github.com/actor-framework/actor-framework/blob/master/libcaf_core/caf/mixin/requester.hpp
+// and it would be good to reflect changes here as and when necessary...
+
 namespace caf::mixin {
 
     // A reducer is a requester that can do requests with reductions
