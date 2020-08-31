@@ -55,3 +55,20 @@ cc_library(
         "@sole",
     ],
 )
+
+
+############# Examples
+
+cc_binary(
+    name = "typed-handler-actor-example",
+    srcs = ["examples/class-actor-extras/typed-handler-actor.cpp"],
+    copts = [
+            "-std=c++17",
+            "-Wno-write-strings",
+            "-fconcepts",
+    ],
+    linkopts = ["-lstdc++fs"],
+    deps = [
+        ":common"
+    ],
+)

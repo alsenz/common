@@ -4,7 +4,54 @@
 
 #include "caf/all.hpp"
 
+#include "common/handles.hpp"
+
+namespace caf {
+
+    namespace detail {
+
+        // If everything is void it's also void, otherwise caf::result<Out...>
+        template<typename... Out>
+        using result_or_void_t = std::conditional_t<
+            std::conjunction_v<std::is_void<Out>...>,
+            void,
+            caf::result<Out...>
+        >;
+
+    }
+
+    // A simple base class that adds virtual const-ref handle(...) methods corresponding to each signature
+    template<typename... Sigs>
+    struct handler_base;
+
+    template<class... Out, class... In>
+    struct handler_base<result<Out...>(In...)> {
+
+        virtual detail::result_or_void_t<Out...> handle(const In &...) = 0; //TODO: handle forwarding correctly here
+
+    };
+
+    template<class... Sigs, class... Out, class... In>
+    struct handler_base<result<Out...>(In...), Sigs...> : handler_base<Sigs...> {
+
+        using handler_base<Sigs...>::handle;
+
+        virtual detail::result_or_void_t<Out...> handle(const In &...) = 0; //TODO handle forwarding correctly here
+
+    };
+
+    //TODO definite need for some examplin' here...
+
+    //TODO build an example here... see if this works...
+
+}
+
 namespace as {
+
+
+
+
+    //TODO deprecate this... this needs to become virtual_handler_base_new or something?
 
     // A simple base structure that adds virtual const-ref handlers for each event. Simples.
     template<typename... Events>
