@@ -40,10 +40,6 @@ namespace caf {
 
     };
 
-    //TODO definite need for some examplin' here...
-
-    //TODO build an example here... see if this works...
-
 }
 
 namespace as {

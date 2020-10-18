@@ -56,19 +56,21 @@ cc_library(
     ],
 )
 
-
 ############# Examples
 
 cc_binary(
     name = "typed-handler-actor-example",
     srcs = ["examples/class-actor-extras/typed-handler-actor.cpp"],
     copts = [
-            "-std=c++17",
-            "-Wno-write-strings",
-            "-fconcepts",
+        "-std=c++17",
+        "-Wno-write-strings",
+        "-fconcepts",
     ],
-    linkopts = ["-lstdc++fs"],
+    linkopts = [
+        "-lstdc++fs",
+        "-lpthread",
+    ],
     deps = [
-        ":common"
+        ":common",
     ],
 )

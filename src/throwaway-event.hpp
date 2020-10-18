@@ -4,6 +4,8 @@
 
 namespace caf {
 
+    //TODO: Kill this.
+
     // A very simple wrapper that converts any event into the same event, returning void (i.e. ignoring any response)
     template<typename Event>
     struct throw_away_event_t : Event {

@@ -11,6 +11,8 @@
 #include "common/virtual-handler.hpp"
 #include "common/reducer-mixin.hpp"
 
+//TODO kill / deprecate all of this.
+
 // This is so close to caf functionality, we're just going to hijack the namespace a bit
 namespace caf {
 
