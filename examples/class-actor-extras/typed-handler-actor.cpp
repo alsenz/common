@@ -9,14 +9,14 @@
 #include "common/typed-handler-actor.hpp"
 #include "common/handles.hpp"
 #include "common/config.hpp"
+#include "common/common-typeids.hpp"
 
 struct event_26 {
     using result_t = int;
     char data;
 };
 
-//Fixme: use the common-typeids header to make sure our offsets are good.
-CAF_BEGIN_TYPE_ID_BLOCK(example_typed_handler_actor, first_custom_type_id + 1918)
+CAF_BEGIN_TYPE_ID_BLOCK(example_typed_handler_actor, gt::common::custom_type_block_end + 50)
     CAF_ADD_TYPE_ID(example_typed_handler_actor, (event_26))
 CAF_END_TYPE_ID_BLOCK(example_typed_handler_actor)
 
