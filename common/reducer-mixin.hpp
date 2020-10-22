@@ -15,6 +15,8 @@ namespace caf::mixin {
     template<class Base, class Subtype>
     class reducer : public Base {
 
+        using Base::Base;
+
         // The addition of MergePolicy allows customisations to the reducer - e.g. to implement a quorum reducer instead.
         template <template <class, class> class ReducerMergePolicy, //Takes a response type and a ReducerFn type
             typename ReducerFn,

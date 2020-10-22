@@ -2,8 +2,6 @@
 
 #include <type_traits>
 
-//TODO i think this just needs to be "handles"....
-
 namespace caf {
 
     namespace detail {
@@ -12,11 +10,15 @@ namespace caf {
 
         template<class StructEvent, class Enable = void>
         struct handles_trait {
-            using type = reacts_to<StructEvent>;
+            //TODO remove comment
+            //using type = reacts_to<StructEvent>;
+            using type = result<void>(StructEvent);
         };
 
         template<class StructEvent>
         struct handles_trait<StructEvent, typename enabler<typename StructEvent::result_t>::type> {
+            //TODO remove comment
+            //using type = typename replies_to<StructEvent>::template with<typename StructEvent::result_t>;
             using type = result<typename StructEvent::result_t>(StructEvent);
         };
 
@@ -28,11 +30,3 @@ namespace caf {
     using handles = typename detail::handles_trait<StructEvent>::type;
 
 } //ns caf
-
-
-
-
-//TODO: new design should come into play here...
-//TODO: we have a new class: caf::typed_handler_actor<Signatures...>
-//TODO: we create a new caf::adheres_to<Event> which is an alias for caf::replies_to with result_t (or nothing if no result_t...)
-//TODO: simples the whole thing is a bit simpler now...

@@ -1,15 +1,18 @@
 COMMON_COPTS = [
-   "-std=c++17",
-   "-fconcepts",
-   "-Wno-write-strings",
+    "-std=c++17",
+    "-fconcepts",
+    "-Wno-write-strings",
 ]
 
-COMMON_LINKOPTS = ["-lstdc++fs", "-lpthread"]
+COMMON_LINKOPTS = [
+    "-lstdc++fs",
+    "-lpthread",
+]
 
 COMMON_DEPS = [
-  "@libcaf",
-  "@nlohmann//:json",
-  "@sole",
+    "@libcaf",
+    "@nlohmann//:json",
+    "@sole",
 ]
 
 cc_library(
@@ -41,7 +44,10 @@ cc_test(
     copts = COMMON_COPTS,
     linkopts = ["-lstdc++fs"],
     visibility = ["//visibility:public"],
-    deps = COMMON_DEPS + [":common", "@gtest//:gtest_main"]
+    deps = COMMON_DEPS + [
+        ":common",
+        "@gtest//:gtest_main",
+    ],
 )
 
 cc_library(
@@ -50,7 +56,10 @@ cc_library(
     copts = COMMON_COPTS,
     linkopts = COMMON_LINKOPTS,
     visibility = ["//visibility:public"],
-    deps = COMMON_DEPS + [":common", "@gtest//:gtest_main"]
+    deps = COMMON_DEPS + [
+        ":common",
+        "@gtest//:gtest_main",
+    ],
 )
 
 ############# Examples
