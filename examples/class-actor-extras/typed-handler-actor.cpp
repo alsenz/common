@@ -77,11 +77,5 @@ auto main(int argc, char** argv) -> int {
     auto code = test_actor_fn(event_26{'a'}).value();
     std::cout << "Code from event: " << code << std::endl;
 
-
-
-
-
-    //TODO here
-
     return 0;
 }

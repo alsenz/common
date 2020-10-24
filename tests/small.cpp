@@ -1,4 +1,5 @@
 #include <vector>
+#include <iostream>
 
 #include "common/small.hpp"
 
@@ -23,7 +24,30 @@ TEST(CommonSmallTests, PilferingAround) {
     EXPECT_EQ(42, vec.at(3));
 }
 
-TEST(CommonSmallTests, SanityCheck) {
+TEST(CommonSmallTests, PilferingAround2) {
+    //std::vector<char[3]> vec;
+    //TODO see how this thing is behaving...
+    //TODO also see how span is behaving beneath..
+    /*char red[3] = {'r', 'e', 'd'};
+    std::cout << "vec.size()" << vec.size() << std::endl;
+    vec.push_back(red);
+    std::cout << "vec.size()" << vec.size() << std::endl;*/
+    std::cout << "sizeof(char[3]): " << sizeof(char[3]) << std::endl;
+    std::cout << "sizeof(std::array<char, 3>): " << sizeof(std::array<char, 3>) << std::endl;
+    std::cout << "sizeof(std::array<std::array<char, 3>, 4>): " << sizeof(std::array<std::array<char, 3>, 4>) << std::endl;
+    EXPECT_EQ(123,456);
+}
+
+TEST(CommonSmallTests, VectorSanityCheck) {
     common::small_vector<char> vec;
     EXPECT_EQ(0, vec.size());
+}
+
+
+TEST(CommonSmallTests, MapSanityCheck) {
+    common::small_map<sizeof(uint64_t), sizeof(char)> smap;
+    EXPECT_EQ(smap.begin(), smap.end());
+    std::byte bytes[sizeof(uint64_t)];
+    EXPECT_EQ(smap.find(bytes), smap.end());
+    //TODO do an insert here as well...
 }
