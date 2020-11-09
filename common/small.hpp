@@ -10,244 +10,74 @@
 #include <functional>
 #include <iterator>
 
+//TODO enable the comparison features! TODO TODO
 #include "nonstd/span.hpp"
 
 #include "variant-match.hpp"
+#include "pack.hpp"
+#include "displace.hpp"
+
+//TODO: step -> stride
+//TODO: push the Stride back into a call to Stride with a constexpr...
+//TODO this way the base iterator never needs to know... so we'd have size() -> byte size... begin end pointer...
+//TODO begin_stride<5>() end_stride<5>() ... should NOT have dereference since we can't *to a span although maybe ->
+//TODO then map should just know... i.e. key_stride, KeyStride, ValueStride...
+//TODO insert needs a stride... erase should be able to take a stride iterator.... that de-refs to a begin and an end...
+//TODO then we have at_stride<5>(idx), etc. etc. should all be sensible the stride iterator is key here...
+
+//Fixme: we shoud split small_range and small_byte_map out into separate files.
 
 // A collection of small vectors, maps and views useful for reading and writing slices
 
+
+//TODO fix copy wherever possible!
+//TODO TODO
+
+
+
 namespace common {
 
-    //TODO might need to re-work this to allow for BLOCKS of bytes as this is currently BROKEN as designed...
-    //TODO i.e. nonstd::span and std::array and std::string_view in a small_vector_view should be transparent.
-    //TODO maybe visit range? TODO TODO understand this library again... TODO TODO TODO
+    //Fixme: performance tune SizeofInitialExtent default value.
 
-    //TODO ALL THE WAY THROUGH WE NEED TO REVIEW EVERY SIZE() USAGE TO CHECK THAT WERE USING THE RIGHT VERSION OF SIZE ON THE ARRAY
-
-    //TODO think about whether this is needed.
-    // LargeSearchBuf: determines whether to use linear or binary search to find(...) in the span
-    template<typename T, size_t LargeSearchBuf = 128>
-    class small_vector_view {
+    //
+    template<typename T, size_t SizeofInitialExtent = 8 * 4 * 4> // Random guess
+    class small_range : public small_range_view<T> {
 
     public:
 
-        typedef std::size_t index_t;
-
-        typedef T element_type;
-        typedef std::remove_cv_t<T> value_type;
-
-        typedef T &reference;
-        typedef T *pointer;
-        typedef T const *const_pointer;
-        typedef T const &const_reference;
-
-        typedef index_t index_type;
-        typedef index_t difference_type;
-
-        typedef pointer iterator;
-        typedef const_pointer const_iterator;
-
-        typedef std::reverse_iterator<iterator> reverse_iterator;
-        typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
-
-        using size_type = std::size_t;
-
-        small_vector_view() : _impl() {}
-
-        small_vector_view(nonstd::span<T> &&spn) : _impl(std::move(spn)) {}
-
-        small_vector_view(const nonstd::span<T> &spn) : _impl(spn) {}
-
-        small_vector_view(T *const ptr, std::size_t size) : _impl(ptr, size) {}
-
-        template<size_t N>
-        small_vector_view(std::array<T, N> &spn) : small_vector_view(spn.data(), spn.size()) {}
-
-        template<size_t N>
-        small_vector_view(const std::array<T, N> &arr) : small_vector_view(arr.data(), arr.size()) {}
-
-        small_vector_view(std::vector<T> &vec) : _impl(vec.data(), vec.size()) {}
-
-        small_vector_view(const std::vector<T> &vec) : _impl(vec.data(), vec.size()) {}
-
-    protected:
-
-        void reset_span(nonstd::span<T> &&spn) {
-            _impl = std::move(spn);
-        }
-
-        void reset_span(const nonstd::span<T> &spn) {
-            _impl = spn;
-        }
-
-        void reset_span(T *const ptr, std::size_t size) {
-            _impl = nonstd::span<T>(ptr, size);
-        }
-
-        template<size_t N>
-        void reset_span(std::array<T, N> &arr) {
-            reset_span(arr.data(), arr.size());
-        }
-
-        template<size_t N>
-        void reset_span(const std::array<T, N> &arr) {
-            reset_span(arr.data(), arr.size());
-        }
-
-        void reset_span(std::vector<T> &vec) {
-            reset_span(vec.data(), vec.size());
-        }
-
-        void reset_span(const std::vector<T> &vec) {
-            reset_span(vec.data(), vec.size());
-        }
-
-        // A special case where an array is used as a buffer but not *all* of the array is in use - some is reserved
-        template<size_t N>
-        void reset_span(std::pair<std::array<T, N>, size_type> &array_size_pair) {
-            reset_span(array_size_pair.first.data(), array_size_pair.second);
-        }
-
-    public:
-
-        //TODO replicate operator=
-
-
-        // ELEMENT ACCESS
-
-        constexpr reference at(size_type pos) {
-            return *(_impl.begin() + pos);
-        }
-
-        constexpr const_reference at(size_type pos) const {
-            return *(_impl.cbegin() + pos);
-        }
-
-        // Operator[] skipped
-
-        constexpr reference front() {
-            return *(_impl.begin());
-        }
-
-        constexpr const_reference front() const {
-            return *(_impl.cbegin());
-        }
-
-        constexpr reference back() {
-            return at(size() - 1);
-        }
-
-        constexpr const_reference back() const {
-            return at(size() - 1);
-        }
-
-        constexpr T *data() noexcept {
-            return _impl.data();
-        }
-
-        constexpr const T *data() const noexcept {
-            _impl.begin();
-            return _impl.data();
-        }
-
-        // ITERATORS
-
-        constexpr iterator begin() noexcept {
-            return _impl.begin();
-        }
-
-        constexpr const_iterator begin() const noexcept {
-            return _impl.begin();
-        }
-
-        constexpr const_iterator cbegin() const noexcept {
-            return _impl.cbegin();
-        }
-
-        constexpr iterator end() noexcept {
-            return _impl.end();
-        }
-
-        constexpr const_iterator end() const noexcept {
-            return _impl.end();
-        }
-
-        constexpr const_iterator cend() const noexcept {
-            return _impl.cend();
-        }
-
-        constexpr reverse_iterator rbegin() noexcept {
-            return _impl.rbegin();
-        }
-
-        constexpr const_reverse_iterator rbegin() const noexcept {
-            return _impl.rbegin();
-        }
-
-        constexpr const_reverse_iterator crbegin() const noexcept {
-            return _impl.crbegin();
-        }
-
-        constexpr reverse_iterator rend() noexcept {
-            return _impl.rend();
-        }
-
-        constexpr const_reverse_iterator rend() const noexcept {
-            return _impl.rend();
-        }
-
-        constexpr const_reverse_iterator crend() const noexcept {
-            return _impl.crend();
-        }
-
-        // CAPACITY
-
-        [[nodiscard]] constexpr bool empty() const noexcept {
-            return _impl.empty();
-        }
-
-        constexpr size_type size() const noexcept {
-            return _impl.size();
-        }
-
-    private:
-
-        nonstd::span<T> _impl;
-    };
-
-
-    //Fixme: performance tune SmallBufBytes default value.
-    template<typename T, size_t SmallBufBytes = 128> //small enough to fit 8 64->64 bit mappings.
-    class small_vector : public small_vector_view<T> {
-
-    public:
-
-        using typename small_vector_view<T>::size_type;
-        using typename small_vector_view<T>::iterator;
-        using typename small_vector_view<T>::const_iterator;
-        using typename small_vector_view<T>::reference;
+        using typename small_range_view<T>::size_type;
+        using typename small_range_view<T>::iterator;
+        using typename small_range_view<T>::const_iterator;
+        using typename small_range_view<T>::reference;
+        using typename small_range_view<T>::element_type;
 
         // Contains the array buffer and the size in use
-        using small_buffer_buff_t = std::array<T, SmallBufBytes / sizeof(T)>;
-        using small_buffer_t = std::pair<small_buffer_buff_t, size_type>;
+        using stack_buffer_t = std::array<T, SizeofInitialExtent / sizeof(T)>;
+        using size_stack_buffer_pair = std::pair<stack_buffer_t, size_type>;
         using heap_vector_t = std::vector<T>;
 
         //Warning: notice the change of API - reserve not fill!
         //Fixme: make this a bit cheaper - don't allocate the array variant at all if the vector can hold it!
-        small_vector(std::size_t reserve_cap) : _impl(std::make_pair(small_buffer_buff_t(), 0)) {
+        small_range(std::size_t reserve_cap) : _impl(std::make_pair(stack_buffer_t(), 0)) {
             reserve(reserve_cap);
         }
 
-        small_vector() : _impl(std::make_pair(small_buffer_buff_t(), 0)) {
+        small_range() : _impl(std::make_pair(stack_buffer_t(), 0)) {
             sync_view();
         }
-
 
     private:
 
         // Ensures the view base class has exactly what the variant has below
         void sync_view() {
-            std::visit([this](auto &elem) { this->reset_span(elem); }, _impl);
+            std::visit(std::match{
+                [this](heap_vector_t &vec) {
+                    this->reset(vec);
+                },
+                [this](size_stack_buffer_pair &pair) {
+                    this->reset(pair.first.data(), pair.second);
+                }
+            }, _impl);
         }
 
     public:
@@ -259,31 +89,43 @@ namespace common {
         // CAPACITY
 
         constexpr size_type max_size() const noexcept {
-            if (std::holds_alternative<small_buffer_t>(_impl)) {
-                return std::get<small_buffer_t>(_impl).first.max_size();
+            if (std::holds_alternative<size_stack_buffer_pair>(_impl)) {
+                return std::get<size_stack_buffer_pair>(_impl).first.max_size();
             } else {
                 return std::get<heap_vector_t>(_impl).max_size();
             }
         }
 
-        constexpr void reserve(size_type new_cap) {
-            if (std::holds_alternative<small_buffer_t>(_impl)) {
-                if (std::get<small_buffer_t>(_impl).first.size() >= new_cap) {
+        template<size_t N>
+        constexpr void reserve_strides(size_type num_strides) {
+            reserve(num_strides * N);
+        }
+
+        constexpr void reserve(size_type new_cap_bytes) {
+            if (std::holds_alternative<size_stack_buffer_pair>(_impl)) {
+                auto &pair = std::get<size_stack_buffer_pair>(_impl);
+                if (pair.first.size() >= new_cap_bytes) {
                     return; // We're good.
                 }
                 // New capacity must be greater than fixed size- updgrade to heap
-                _impl = heap_vector_t();
+                auto next_impl = heap_vector_t(new_cap_bytes); // Fill
+                //Fixme: potentially use move
+                std::copy(pair.first.begin(), pair.first.end(), next_impl.begin());
+                _impl = std::move(next_impl);
                 sync_view();
+                return;
             }
             // Reserve on heap
-            std::get<heap_vector_t>(_impl).reserve(new_cap);
+            std::get<heap_vector_t>(_impl).reserve(new_cap_bytes);
+            sync_view();
         }
 
         constexpr size_type capacity() const noexcept {
-            if (std::holds_alternative<small_buffer_t>(_impl)) {
-                return std::get<small_buffer_t>(_impl).first.size();
+            if (std::holds_alternative<size_stack_buffer_pair>(_impl)) {
+                // Capacity interpreted as the space currently pre-allocated.
+                return std::get<size_stack_buffer_pair>(_impl).first.size();
             } else {
-                return std::get<heap_vector_t>(_impl).capacity();
+                return std::get<size_stack_buffer_pair>(_impl).capacity();
             }
         }
 
@@ -298,114 +140,150 @@ namespace common {
 
         constexpr void clear() noexcept {
             std::visit(std::match{
-                [](small_buffer_t &v) { v.second = 0; },
+                [](size_stack_buffer_pair &p) { p.second = 0; },
                 [](heap_vector_t &v) { v.clear(); }
             }, _impl);
         }
 
-        constexpr iterator insert(const_iterator pos, const T &value) {
+        // Note: remember size and reserve work on raw bytews
+
+        // Element type is a single T if Stride = 0, otherwise a span of Ts
+        constexpr iterator insert(const_iterator pos, const typename small_range_view<T>::value_type &value) {
+            const auto diff = pos - this->begin();
             reserve(this->size() + 1);
             return std::visit(std::match{
-                [&pos, &value](small_buffer_t &v) {
-                    std::copy(pos, v.first.data() + v.first.size() - 1, pos + 1); // Move the data to the right.
-                    v.first.at(pos) = value;
-                    v.second++;
-                    return pos;
+                [&value, diff, this](size_stack_buffer_pair &pair) {
+                    std::copy(pair.first.begin() + diff, pair.first.begin() + pair.second, pair.first.begin() + diff + 1);
+                    pair.second++;
+                    pair.first.at(diff) = value;
+                    return this->begin() + diff;
                 },
-                [&pos, &value](heap_vector_t &v) { return v.insert(heap_vector_t::iterator(pos), value); }
+                [&value, diff, this](heap_vector_t &v) {
+                    return _impl.insert(_impl.begin() + diff, value);
+                }
             }, _impl);
         }
 
         constexpr iterator insert(const_iterator pos, T &&value) {
+            const auto diff = pos - this->begin();
             reserve(this->size() + 1);
             return std::visit(std::match{
-                [&pos, &value](small_buffer_t &v) {
-                    std::copy(pos, v.first.data() + v.first.size() - 1, pos + 1); // Move the data to the right.
-                    v.first.at(pos) = std::move(value);
-                    v.second++;
-                    return pos;
+                [&value, diff, this](size_stack_buffer_pair &pair) {
+                    std::copy(pair.first.begin() + diff, pair.first.begin() + pair.second, pair.first.begin() + diff + 1);
+                    pair.second++;
+                    pair.first.at(diff) = std::move(value);
+                    return this->begin() + diff;
                 },
-                [&pos, &value](heap_vector_t &v) { return v.insert(heap_vector_t::iterator(pos), std::move(value)); }
+                [&value, diff, this](heap_vector_t &v) {
+                    return _impl.insert(_impl.begin() + diff, std::move(value));
+                }
             }, _impl);
         }
 
         //Fixme: skipped: constexpr iterator insert( const_iterator pos, size_type count,
         //                           const T& value );
 
-        //Fixme: skipped: template< class InputIt >
-        //constexpr iterator insert( const_iterator pos, InputIt first, InputIt last );
+        template<class InputIt>
+        constexpr iterator insert(const_iterator pos, InputIt first, InputIt last) {
+            const auto diff = pos - this->begin();
+            reserve(this->size() + diff);
+            return std::visit(std::match{
+                [&first, &last, diff, this](size_stack_buffer_pair &pair) {
+                    const auto dist = last - first;
+                    std::copy(pair.first.begin() + diff, pair.first.begin() + pair.second, pair.first.begin() + diff + dist);
+                    pair.second += dist;
+                    std::copy(first, last, pair.first.begin() + diff);
+                    return this->begin() + diff;
+                },
+                [&first, &last, diff, this](heap_vector_t &v) {
+                    return _impl.insert(_impl.begin() + diff, first, last);
+                }
+            }, _impl);
+        }
+
+        template<size_t N>
+        constexpr stride_iterator<T, N> insert_stride(const stride_iterator<T, N> pos, nonstd::span<T, N> stride) {
+            return stride_iterator<T, N>(insert(pos.begin(), stride.begin(), stride.end()));
+        }
+
+        //Fixme: template<size_t N>
+        //Fixme: constexpr stride_iterator<T, N> insert_strides(const stride_iterator<T, N> pos, stride_iterator<T, N> first, stride_iterator<T, N> last)
 
         //Fixme: skipped: constexpr iterator insert( const_iterator pos, std::initializer_list<T> ilist );
 
-
         template<class... Args>
         constexpr iterator emplace(const_iterator pos, Args &&... args) {
+            size_type diff = pos - this->begin(); //We must convert pos to an index since reserve could invalidate it
             reserve(this->size() + 1);
-
-            if (std::holds_alternative<small_buffer_t>(_impl)) {
-                auto &v = std::get<small_buffer_t>(_impl);
-                std::copy(pos, v.first.data() + v.first.size() - 1, pos + 1); // Move the data to the right.
-                v.first.at(pos) = T(args...); //Fixme: is this how we emplace properly? Should we use placement new?
-                v.second++;
-                return pos;
-            }
-
-            return std::get<heap_vector_t>(_impl)
-                .emplace(heap_vector_t::iterator(pos), std::move(args)...);
-        }
-
-        constexpr iterator erase(const_iterator pos) {
+            //Fixme be more clever about this and move the args in with the capture
+            auto value = T(std::move(args...));
             return std::visit(std::match{
-                [pos](small_buffer_t &v) {
-                    v.second--;
-                    std::copy(pos + 1, v.first.size(), pos); //TODO test this works.
-                    return pos;
+                [diff, &value, this](size_stack_buffer_pair &pair) {
+                    std::copy(pair.first.data() + diff,
+                              pair.first.data() + pair.second,
+                              pair.first.data() + diff + 1); // Move the data to the right.
+                    pair.first.at(diff) = std::move(value);
+                    pair.second++;
+                    return this->begin() + diff;
                 },
-                [pos](heap_vector_t &v) { return iterator(v.erase(heap_vector_t::iterator(pos))); }
+                [diff, &value](heap_vector_t &v) {
+                    return v.insert(v.begin() + diff, std::move(value));
+                }
             }, _impl);
         }
 
+        //TODO - fix this, then do the range-based erase, then do the stride erase, which should be based on the range based.
+
+        constexpr iterator erase(iterator pos) {
+            return std::visit(std::match{
+                [pos](size_stack_buffer_pair &pair) {
+                    //TODO check this works... may need to be copy backward...
+                    std::copy(pos + 1, pair.first.data() + pair.second, pos);
+                    pair.second--;
+                },
+                [pos](heap_vector_t &v) {
+                    return iterator(v.erase(pos));
+                }
+            }, _impl);
+        }
+
+        //TODO do this
+        //TODO TODO
         //Fixme skipped: constexpr iterator erase(const_iterator first, const_iterator last)
 
+        //TODO erase_stride! stride_iterator pos...
+
         constexpr void push_back(const T &value) {
-            reserve(this->size() + 1);
-            std::visit(std::match{
-                [&value](small_buffer_t &v) {
-                    v.at(v.second) = value;
-                    v.second++;
-                },
-                [&value](heap_vector_t &v) { v.push_back(value); }
-            }, _impl);
+            //Fixme: write more specificly optimised version
+            insert(this->end(), value);
         }
 
         constexpr void push_back(T &&value) {
-            reserve(this->size() + 1);
-            std::visit(std::match{
-                [&value](small_buffer_t &v) {
-                    v.at(v.second) = std::move(value);
-                    v.second++;
-                },
-                [&value](heap_vector_t &v) { v.push_back(std::move(value)); }
-            }, _impl);
+            //Fixme: write more specificly optimised version
+            insert(this->end(), std::move(value));
         }
 
         template<class... Args>
-        constexpr reference emplace_back(Args &&... args) {
-            reserve(this->size() + 1);
-            return std::visit(std::match{
-                [&args...](small_buffer_t &v) {
-                    v.at(v.second) = T(std::move(args)...);
-                    v.second++;
-                },
-                [&args...](heap_vector_t &v) { v.emplace_back(std::move(args)...); }
-            }, _impl);
+        constexpr iterator emplace_back(Args &&... args) {
+            return emplace(this->end(), std::move(args)...);
         }
 
         constexpr void pop_back() {
-            erase(this->end());
+            erase(this->end()-1);
         }
 
-        //Fixme: skipped: constexpr void resize( size_type count );
+        constexpr void resize(size_type count) {
+            std::visit(std::match{
+                [count](size_stack_buffer_pair &pair) {
+                    // Default initialise the values
+                    std::fill(pair.first.begin() + pair.second, pair.first.end(), T());
+                    pair.second = count;
+                },
+                [count](heap_vector_t &v) {
+                    v.resize(count);
+                }
+            }, _impl);
+        }
         //Fixme: skipped: constexpr void resize( size_type count, const value_type& value );
 
         //Fixme: skipped: constexpr void swap( vector& other ) noexcept
@@ -415,23 +293,26 @@ namespace common {
 
     private:
 
-        std::variant<small_buffer_t, heap_vector_t> _impl;
+        std::variant<size_stack_buffer_pair, heap_vector_t> _impl;
 
     };
 
+    //Note neither K_Stride nor V_Stride may be 0.
+    template<size_t K_Stride, size_t V_Stride, typename byte_type = std::byte>
+    struct small_byte_map_iterator {
 
-    template<size_t K_Size, size_t V_Size, typename byte_type = std::byte>
-    struct small_map_view_iterator {
+        using value_type = std::pair<nonstd::span<byte_type, K_Stride>, nonstd::span<byte_type, V_Stride>>;
 
-        using value_type = std::pair<nonstd::span<byte_type>, nonstd::span<byte_type>>;
+        small_byte_map_iterator() : impl(nonstd::span<byte_type, K_Stride>((byte_type *)nullptr, (size_t) 0), nonstd::span<byte_type, V_Stride>((byte_type *)nullptr, (size_t) 0)) {
+            static_assert(K_Stride > 0 , "In small_byte_map, K_Stride must be > 0");
+            static_assert(V_Stride > 0 , "In small_byte_map, V_Stride must be > 0");
+        }
 
-        small_map_view_iterator() : impl(nonstd::span<byte_type>(), nonstd::span<byte_type>()) {}
+        small_byte_map_iterator(const nonstd::span<byte_type, K_Stride> &key_span,
+                                const nonstd::span<byte_type, V_Stride> &value_span) : impl(key_span, value_span){}
 
-        small_map_view_iterator(const nonstd::span<byte_type> &key_span,
-            const nonstd::span<byte_type> &value_span) : impl(key_span, value_span){}
-
-        small_map_view_iterator(nonstd::span<byte_type> &&key_span,
-                                nonstd::span<byte_type> &&value_span)
+        small_byte_map_iterator(nonstd::span<byte_type, K_Stride> &&key_span,
+                                nonstd::span<byte_type, V_Stride> &&value_span)
                                 : impl(std::move(key_span), std::move(value_span)) {}
 
         value_type &operator* () {
@@ -442,57 +323,57 @@ namespace common {
             return &impl;
         }
 
-        small_map_view_iterator<K_Size, V_Size> &operator++() {
-            impl.first = nonstd::span<byte_type>(impl.first.data() + K_Size, K_Size);
-            impl.second = nonstd::span<byte_type>(impl.second.data() + V_Size, V_Size);
+        small_byte_map_iterator<K_Stride, V_Stride> &operator++() {
+            impl.first = nonstd::span<byte_type, K_Stride>(impl.first.data() + K_Stride, K_Stride);
+            impl.second = nonstd::span<byte_type, V_Stride>(impl.second.data() + V_Stride, V_Stride);
             return *this;
         }
 
-        small_map_view_iterator<K_Size, V_Size> operator++(int) {
-            return small_map_view_iterator<K_Size, V_Size>(
-                nonstd::span<byte_type>(impl.first.data() + K_Size, K_Size),
-                nonstd::span<byte_type>(impl.second.data() + V_Size, V_Size)
+        small_byte_map_iterator<K_Stride, V_Stride> operator++(int) {
+            return small_byte_map_iterator<K_Stride, V_Stride>(
+                nonstd::span<byte_type, K_Stride>(impl.first.data() + K_Stride, K_Stride),
+                nonstd::span<byte_type, V_Stride>(impl.second.data() + V_Stride, V_Stride)
             );
         }
 
         //Fixme: this should be difference type
-        small_map_view_iterator operator+ (const std::size_t n) const {
-            return small_map_view_iterator<K_Size, V_Size>(
-                nonstd::span<byte_type>(impl.first.data() + n * K_Size, K_Size),
-                nonstd::span<byte_type>(impl.second.data() + n * V_Size, V_Size)
+        small_byte_map_iterator operator+ (const std::size_t n) const {
+            return small_byte_map_iterator<K_Stride, V_Stride>(
+                nonstd::span<byte_type, K_Stride>(impl.first.data() + n * K_Stride, K_Stride),
+                nonstd::span<byte_type, V_Stride>(impl.second.data() + n * V_Stride, V_Stride)
             );
         }
 
         //Fixme: this should be difference type
-        small_map_view_iterator operator- (const std::size_t n) const {
-            return small_map_view_iterator<K_Size, V_Size>(
-                nonstd::span<byte_type>(impl.first.data() - n * K_Size, K_Size),
-                nonstd::span<byte_type>(impl.second.data() - n * V_Size, V_Size)
+        small_byte_map_iterator operator- (const std::size_t n) const {
+            return small_byte_map_iterator<K_Stride, V_Stride>(
+                nonstd::span<byte_type, K_Stride>(impl.first.data() - n * K_Stride, K_Stride),
+                nonstd::span<byte_type, V_Stride>(impl.second.data() - n * V_Stride, V_Stride)
             );
         }
 
         // Comparison behaviour is the same as comparison of the key pointer, with no extent (so end can have 0 extent)
-        bool operator ==(const small_map_view_iterator<K_Size, V_Size> &b) const {
+        bool operator ==(const small_byte_map_iterator<K_Stride, V_Stride> &b) const {
             return impl.first.data() == b.impl.first.data();
         }
 
-        bool operator !=(const small_map_view_iterator<K_Size, V_Size> &b) const {
+        bool operator !=(const small_byte_map_iterator<K_Stride, V_Stride> &b) const {
             return impl.first.data() != b.impl.first.data();
         }
 
-        bool operator >(const small_map_view_iterator<K_Size, V_Size> &b) const {
+        bool operator >(const small_byte_map_iterator<K_Stride, V_Stride> &b) const {
             return impl.first.data() > b.impl.first.data();
         }
 
-        bool operator <(const small_map_view_iterator<K_Size, V_Size> &b) const {
+        bool operator <(const small_byte_map_iterator<K_Stride, V_Stride> &b) const {
             return impl.first.data() < b.impl.first.data();
         }
 
-        bool operator >=(const small_map_view_iterator<K_Size, V_Size> &b) const {
+        bool operator >=(const small_byte_map_iterator<K_Stride, V_Stride> &b) const {
             return impl.first.data() >= b.impl.first.data();
         }
 
-        bool operator <=(const small_map_view_iterator<K_Size, V_Size> &b) const {
+        bool operator <=(const small_byte_map_iterator<K_Stride, V_Stride> &b) const {
             return impl.first.data() <= b.impl.first.data();
         }
 
@@ -500,129 +381,120 @@ namespace common {
 
     };
 
-} // ns common
-
-
-//Fixme: the iterator traits on this.
-
-namespace common {
-
-
-    //TODO LESS IS MORE
-    //TODO let's JUST build this based on std::byte and then have everything else wrap it.
 
     // A small multimap backed by contiguous byte storage. Great for operating on small packed + serialised structures.
-    template<size_t K_Size, size_t V_Size, size_t LargeSearchBuf = 128>
-    class small_map_view {
+    template<size_t K_Stride = 1, size_t V_Stride = 1, typename byte_type = std::byte, size_t InitialExtent = 128>
+    class small_byte_map_view {
 
     public:
 
-        using iterator = small_map_view_iterator<K_Size, V_Size>;
-        using const_iterator = small_map_view_iterator<K_Size, V_Size, const std::byte>;
+        using iterator = small_byte_map_iterator<K_Stride, V_Stride, byte_type>;
+        using const_iterator = small_byte_map_iterator<K_Stride, V_Stride, const byte_type>;
         using size_type = std::size_t;
-        using key_type = std::byte[K_Size]; //Fixme: use these aliases more often to make things clearer
-        using value_type = std::byte[V_Size];
+        using key_view_type = nonstd::span<byte_type, K_Stride>; //Individual key view
+        using value_view_type = nonstd::span<byte_type, V_Stride>; //Individual value view
 
-        //TODO TODO this doesn't quite work again... we wanna be able to iterate in CHUNKS
-        //TODO TODO need to have a think here... I thought this would work...
-        //TODO but it's not since this is working as a pointer to a byte... we need a 4 byte block concept
-        //TODO urgh urgh urgh TOOD this is pretty broke.
-        using key_container = small_vector_view<std::byte[K_Size], LargeSearchBuf>;
-        using value_container = small_vector_view<std::byte[V_Size], LargeSearchBuf>;
+        using key_range_view = small_range_view<byte_type, K_Stride>;
+        using value_range_view = small_range_view<byte_type, V_Stride>;
 
-        small_map_view() : _keys(), _values() {}
+        constexpr const static std::size_t initial_extent = InitialExtent;
 
-        small_map_view(std::byte *const ptr, std::size_t byte_size)
-            : _keys(static_cast<std::byte[K_Size]>(ptr), typed_size(byte_size)),
-            _values(static_cast<std::byte[V_Size]>(ptr + (K_Size * typed_size(byte_size))), typed_size(byte_size)) {}
+        // Helper function to build a view over a single contiguous underlying byte_type array
+        static auto build_from_contiguous_bytes(byte_type *data, size_type size_bytes, bool sorted = false) {
+            if ((size_bytes % (K_Stride + V_Stride)) != 0) {
+                throw std::range_error("small_byte_map_view cannot be built from contiguous bytes that are no divisible by K_Stride + V_step");
+            }
+            const size_type num_elems = size_bytes / (K_Stride + V_Stride);
+            return small_byte_map_view<K_Stride, V_Stride, byte_type, InitialExtent>(data,
+                data + (K_Stride * num_elems), size_bytes, sorted);
+        }
 
-        //Fixme: add some constructors here
+        template<size_type Extent>
+        static auto build_from_contiguous_bytes(nonstd::span<byte_type, Extent> spn, bool sorted = false) {
+            return build_from_contiguous_bytes(spn.data(), spn.size(), sorted);
+        }
+
+        template<template<typename, typename> typename C, typename Alloc>
+        static auto build_from_contiguous_bytes(C<byte_type, Alloc> &cont, bool sorted = false) {
+            return build_from_contiguous_bytes(cont.data(), cont.size(), sorted);
+        }
+
+        small_byte_map_view(bool sorted = false) : _keys(), _values(), _is_sorted(sorted) {}
+
+        small_byte_map_view(byte_type *k_ptr, byte_type *v_ptr, size_type size_bytes, bool sorted = false)
+            : _keys(k_ptr, size_bytes), _values(v_ptr, size_bytes), _is_sorted(sorted) {}
+
+        template<size_type Extent>
+        small_byte_map_view(nonstd::span<byte_type, Extent> key_spn, nonstd::span<byte_type, Extent> value_spn, bool sorted = false)
+            : _keys(key_spn), _values(value_spn), _is_sorted(sorted) {}
+
+        template<template <typename, typename> typename C, typename Alloc>
+        small_byte_map_view(C<byte_type, Alloc> &key_cont, C<byte_type, Alloc> &value_cont, bool sorted = false)
+            : small_byte_map_view(key_cont.data(), value_cont.data(), key_cont.size(), sorted) {}
 
     protected:
 
-        constexpr const std::size_t typed_size(const std::size_t byte_size) const {
-            return byte_size / (K_Size + V_Size);
+        template<size_t Extent>
+        void reset(nonstd::span<byte_type, Extent> key_spn, nonstd::span<byte_type, Extent> value_spn) {
+            _keys = key_spn;
+            _values = value_spn;
         }
 
-        constexpr const bool valid_byte_size(const std::size_t byte_size) const {
-            return (byte_size % (K_Size + V_Size)) == 0;
+        //Fixme: size checking.
+        void reset(byte_type *k_ptr, byte_type *v_ptr, size_type k_size_bytes, size_type v_size_bytes) {
+            _keys = nonstd::span<byte_type>(k_ptr, k_size_bytes);
+            _values = nonstd::span<byte_type>(v_ptr, v_size_bytes);
         }
 
-        // Returns an index to the first byte in the underlying byte array that stores the first value in the value vector
-        constexpr const std::size_t v_byte_offset(const std::size_t num_elems) const {
-            return K_Size * num_elems;
+        template<template <typename, typename> typename C, typename Alloc>
+        void reset(C<byte_type, Alloc> &key_cont, C<byte_type, Alloc> &value_cont) {
+            // Fixme (here and elsewhere) more size checking on these pointer ariths?
+            reset(key_cont.data(), value_cont.data(), key_cont.size());
         }
 
-        constexpr const std::size_t k_byte_offset_for_idx(const std::size_t elem_idx) const {
-            return elem_idx * K_Size;
+        template<size_t Extent, size_t K_Stride2, size_t V_Stride2>
+        void reset(small_range<byte_type, Extent, K_Stride2> &k_range, small_range<byte_type, Extent, V_Stride2> &v_range) {
+            reset(k_range.data(), v_range.data(), k_range.size(), v_range.size());
         }
 
-        constexpr const std::size_t v_byte_offset_for_idx(const std::size_t total_num_elems, const std::size_t elem_idx) const {
-            return v_byte_offset(total_num_elems) + elem_idx * V_Size;
-        }
 
-        void reset_span(const nonstd::span<std::byte> &spn) {
-            reset_span(spn.data(), spn.size());
-        }
-
-        void reset_span(std::byte *const ptr, std::size_t byte_size) {
-            //TODO this is completely broken! TODO TODO this is basically working as a pointer-to-byte-* i.e. the beignning of the array.
-            //TODO this needs to get std::byte *... with a width... like a std::4_byte_*- that would also fix it...
-            //TODO i.e. the mistake in our assumption is sizeof(std::byte[4]). BUT IT DOES WORK THAT WAY...
-            //TODO we need to be able to type to std::vector<char{4]> and have it behave normally
-            //_keys.reset_span(reinterpret_cast<std::byte[K_Size]>(ptr), typed_size(byte_size));
-            //_values.reset_span(reinterpret_cast<std::byte[V_Size]>(ptr + (K_Size * typed_size(byte_size))), typed_size(byte_size));
-        }
-
-        template<size_t N>
-        void reset_span(std::array<std::byte, N> &arr) {
-            //Fixme: constexpr check on N modulo
-            reset_span(arr.data(), arr.size());
-        }
-
-        template<size_t N>
-        void reset_span(const std::array<std::byte, N> &arr) {
-            //Fixme: constexpr check on N modulo
-            reset_span(arr.data(), arr.size());
-        }
-
-        void reset_span(std::vector<std::byte> &vec) {
-            reset_span(vec.data(), vec.size());
-        }
-
-        void reset_span(const std::vector<std::byte> &vec) {
-            reset_span(vec.data(), vec.size());
-        }
-
-        // A special case where an array is used as a buffer but not *all* of the array is in use - some is reserved
-        template<size_t N>
-        void reset_span(std::pair<std::array<std::byte, N>, std::size_t> &array_size_pair) {
-            reset_span(array_size_pair.first.data(), array_size_pair.second);
-        }
-
-        constexpr typename key_container::iterator find_key(const key_type &needle) noexcept {
-            if (_got_sorted) {
-                return std::binary_search(_keys.begin(), _keys.end(), needle);
+        // Has the usual find semantics - i.e. if not found will return end()
+        constexpr typename key_range_view::iterator find_key(key_view_type needle) noexcept {
+            if (_is_sorted) {
+                auto it = std::lower_bound(_keys.begin(), _keys.end(), needle);
+                if(it != _keys.end() && it.to_span() == needle) { //Fixme: span cast so that 0 Stride will work
+                    return it;
+                }
+                return _keys.end();
             } else {
+                // Linear search through a buffer on the stack.
+                // Searching through an array linearly - O(N)
+                // 16 CPU cores -> 32 virtual CPU cores -> 2x2 4 cpu level parellism
+                // Seraching binary wise - O(log(N))
                 return std::find(_keys.begin(), _keys.end(), needle);
             }
         }
 
-        constexpr typename key_container::const_iterator find_key(const key_type &needle) const noexcept {
-            if (_got_sorted) {
-                return std::binary_search(_keys.begin(), _keys.end(), needle);
+        // Has the usual find semantics - i.e. if not found will return end()
+        constexpr typename key_range_view::const_iterator find_key(key_view_type needle) const noexcept {
+            if (_is_sorted) {
+                auto it = std::lower_bound(_keys.begin(), _keys.end(), needle);
+                if(it != _keys.end() && it.to_span() == needle) { //Fixme: span cast so that 0 Stride will work
+                    return it;
+                }
+                return _keys.end();
             } else {
                 return std::find(_keys.begin(), _keys.end(), needle);
             }
         }
 
         // Call this only once the underlying range has been sorted due to expansions
-        void make_sorted() {
-            _got_sorted = true;
+        void sorted(bool is_sorted = true) {
+            _is_sorted = is_sorted;
         }
 
         bool is_sorted() const  {
-            return _got_sorted;
+            return _is_sorted;
         }
 
     public:
@@ -631,9 +503,11 @@ namespace common {
             if(_keys.empty()) {
                 return iterator();
             }
+            // Note this always assumes that the key and value iterators have steps.
+            // Fixme: ensure iterator in no-step mode will construct from a byte pointer
             return iterator(
-                nonstd::span<std::byte>(*_keys.begin(), K_Size),
-                nonstd::span<std::byte>(*_values.begin(), V_Size)
+                _keys.begin(),
+                _values.begin()
             );
         }
 
@@ -641,9 +515,11 @@ namespace common {
             if(_keys.empty()) {
                 return const_iterator();
             }
+            // Note this always assumes that the key and value iterators have steps.
+            // Fixme: ensure iterator in no-step mode will construct from a byte pointer
             return const_iterator(
-                nonstd::span<const std::byte>(*_keys.begin(), K_Size),
-                nonstd::span<const std::byte>(*_values.begin(), V_Size)
+                _keys.begin(),
+                _values.begin()
             );
         }
 
@@ -651,9 +527,11 @@ namespace common {
             if(_keys.empty()) {
                 return const_iterator();
             }
+            // Note this always assumes that the key and value iterators have steps.
+            // Fixme: ensure iterator in no-step mode will construct from a byte pointer
             return const_iterator(
-                nonstd::span<const std::byte>(*_keys.cbegin(), K_Size),
-                nonstd::span<const std::byte>(*_values.cbegin(), V_Size)
+                _keys.begin(),
+                _values.begin()
             );
         }
 
@@ -662,11 +540,11 @@ namespace common {
             if(_keys.empty()) {
                 return iterator();
             }
+            // Note this always assumes that the key and value iterators have steps.
+            // Fixme: ensure iterator in no-step mode will construct from a byte pointer
             return iterator(
-                //TODO ensure this is valid when this iterator is very much pointing "off the end"
-                //TODO - this is when compared against ++ in the loop, which WILL point off the end.
-                nonstd::span<std::byte>(*_keys.end(), K_Size),
-                nonstd::span<std::byte>(*_values.end(), V_Size)
+                _keys.end(),
+                _values.end()
             );
         }
 
@@ -674,10 +552,11 @@ namespace common {
             if(_keys.empty()) {
                 return const_iterator();
             }
+            // Note this always assumes that the key and value iterators have steps.
+            // Fixme: ensure iterator in no-step mode will construct from a byte pointer
             return const_iterator(
-                //TODO ensure this is valid when this iterator is very much pointing "off the end"
-                nonstd::span<const std::byte>(*_keys.end(), K_Size),
-                nonstd::span<const std::byte>(*_values.end(), V_Size)
+                _keys.end(),
+                _values.end()
             );
         }
 
@@ -685,10 +564,11 @@ namespace common {
             if(_keys.empty()) {
                 return const_iterator();
             }
+            // Note this always assumes that the key and value iterators have steps.
+            // Fixme: ensure iterator in no-step mode will construct from a byte pointer
             return const_iterator(
-                //TODO ensure this is valid when this iterator is very much pointing "off the end"
-                nonstd::span<const std::byte>(*_keys.cend(), K_Size),
-                nonstd::span<const std::byte>(*_values.cend(), V_Size)
+                _keys.end(),
+                _values.end()
             );
         }
 
@@ -702,38 +582,26 @@ namespace common {
 
         //Fixme: size_type max_size() const noexcept;
 
-        //TODO check operator = for byte arrays! TODO TODO - this may not work with the find - need to pass through comparator!
-
-        value_type &at(const std::byte (&key)[K_Size]) {
-            typename key_container::iterator pos;
-            if(is_sorted()) {
-                pos = std::lower_bound(_keys.begin(), _keys.end(), key);
-            } else { // This is faster for small vectors which we leave unsorted
-                pos = std::find(_keys.begin(), _keys.end(), key);
-            }
-            if(pos == _keys.end() || _keys.at(pos) != key) {
-                throw std::out_of_range("key is not in small_map_view");
+        value_view_type at(key_view_type key) {
+            typename key_range_view::iterator pos = find_key(key);
+            if(pos == _keys.end()) {
+                throw std::out_of_range("key is not in small_byte_map_view");
             }
             auto diff = pos - _keys.begin(); //Which could be 0!
-            return _values.at(diff);
+            return _values.begin() + diff;
         }
 
-        const value_type &at(const std::byte (&key)[100]) const {
-            typename key_container::iterator pos;
-            if(is_sorted()) {
-                pos = std::lower_bound(_keys.begin(), _keys.end(), key);
-            } else { // This is faster for small vectors which we leave unsorted
-                pos = std::find(_keys.begin(), _keys.end(), key);
-            }
-            if(pos == _keys.end() || _keys.at(pos) != key) {
-                throw std::out_of_range("key is not in small_map_view");
+        const value_view_type &at(key_view_type key) const {
+            typename key_range_view::iterator pos = find_key(key);
+            if(pos == _keys.end()) {
+                throw std::out_of_range("key is not in small_byte_map_view");
             }
             auto diff = pos - _keys.begin(); //Which could be 0!
-            return _values.at(diff);
+            return _values.begin() + diff;
         }
 
-        size_type count(const key_type &key) const {
-            if(is_sorted()) {
+        size_type count(const key_view_type &key) const {
+            if(is_sorted() && size() > InitialExtent) { // Our heuristic for whether it's worth searching.
                 auto lower = std::lower_bound(_keys.begin(), _keys.end(), key);
                 auto upper = std::upper_bound(lower, _keys.end(), key);
                 return std::count(lower, upper, key);
@@ -744,35 +612,25 @@ namespace common {
             }
         }
 
-        iterator find(const key_type& key) {
-            typename key_container::iterator pos;
-            if(is_sorted()) {
-                pos = std::lower_bound(_keys.begin(), _keys.end(), key);
-            } else { // This is faster for small vectors which we leave unsorted
-                pos = std::find(_keys.begin(), _keys.end(), key);
+        iterator find(const key_view_type& key) {
+            auto pos = find_key(key); //Gives me an iterator that gives me a span here
+            if(pos == _keys.end()) {
+                return end();
             }
-            if(pos != _keys.end() && *pos == key) {
-                auto diff = pos - _keys.begin(); //Which could be 0!
-                return begin() + diff;
-            }
-            return end();
+            auto diff = _keys.end() - pos;
+            return iterator(*pos, *(_values.begin() + diff));
         }
 
-        const_iterator find(const key_type& key) const {
-            typename key_container::const_iterator pos;
-            if(is_sorted()) {
-                pos = std::lower_bound(_keys.cbegin(), _keys.cend(), key);
-            } else { // This is faster for small vectors which we leave unsorted
-                pos = std::find(_keys.cbegin(), _keys.cend(), key);
+        const_iterator find(const key_view_type& key) const {
+            auto pos = find_key(key); //Gives me an iterator that gives me a span here
+            if(pos == _keys.end()) {
+                return end();
             }
-            if(pos != _keys.cend() && *pos == key) {
-                auto diff = pos - _keys.cbegin(); //Which could be 0!
-                return cbegin() + diff;
-            }
-            return cend();
+            auto diff = _keys.end() - pos;
+            return const_iterator(*pos, *(_values.begin() + diff));
         }
 
-        bool contains(const key_type& key) const {
+        bool contains(const key_view_type& key) const {
             return find(key) != end();
         }
 
@@ -782,48 +640,136 @@ namespace common {
 
     private:
 
-        key_container _keys; //This is sorted above LargeSearchBuf, otherwise use linear search for parallelism.
-        value_container _values;
-        bool _got_sorted = false; // If reserve moves to the heap, we sort the keys (and values) and use binary search
+        key_range_view _keys; //This is sorted above InitialExtent, otherwise use linear search for parallelism.
+        value_range_view _values;
+        bool _is_sorted = false; // If reserve moves to the heap, we sort the keys (and values) and use binary search
 
     };
 
-    // A small map is a map for small maps which *doesn't* break out into a full heap-based std::unordered_map unlike std::small_vector does!
+    //TODO in the implementation, no point in having a single underlying buffer.... if we're using the view we can just manually make a nice span..
+
+    //Fixme: allow for steps of 0, which currently is broke where we just return byte for everything.
+
+    // A small map is a map for small maps which *doesn't* break out into a full heap-based std::unordered_map unlike std::small_range does!
     // Instead, it follows the same layout as before just moves it to the heap, so that it can quickly be serialised or deserialised
-    template<size_t K_Size, size_t V_Size, size_t LargeSearchBuf = 128>
-    class small_map : public small_map_view<K_Size, V_Size, LargeSearchBuf> {
+    template<size_t K_Stride = 1, size_t V_Stride = 1, typename byte_type = std::byte, size_t InitialExtent = 8 * 4 * 4>
+    class small_byte_map : public small_byte_map_view<K_Stride, V_Stride, byte_type, InitialExtent> {
 
     public:
 
-        // Constructo with a reserve in *number of elements*!
-        small_map(std::size_t reserve_cap) : _impl(required_byte_size(reserve_cap)) {
+        // Construct with a reserve in *number of elements* (not byte size)!
+        small_byte_map(std::size_t reserve_num_entries) : _keys_impl(reserve_num_entries * K_Stride), _values_impl(reserve_num_entries * V_Stride) {
             sync_views();
         }
 
-        small_map() : _impl() {
+        small_byte_map() : _keys_impl(), _values_impl() {
             sync_views();
         }
 
+        //Extra APIs
 
-        //TODO various - we'll have to find a way to chopping this in two...
+        // Write the key range then the value range to a concatenated vector - useful for serialising
+        std::vector<byte_type> to_vector() const {
+            std::vector<byte_type> vec;
+            to_range(vec);
+            return vec;
+        }
 
-        //TODO reserve will need, confusingly, to do a trick checking for LargeSearchBuf before linear searching...
-        //TODO this is easy enough I think -- start with reserve as before
+        template<template<typename, typename> typename C, typename Alloc>
+        C<byte_type, Alloc> to_range() const {
+            C<byte_type, Alloc> cont;
+            to_range(cont);
+            return cont;
+        }
+
+        // Generic version nice for serialising to e.g. rocks Slices.
+        template<template<typename, typename> typename C, typename Alloc>
+        void to_range(C<byte_type, Alloc> &target) const {
+            target.resize(_keys_impl.size() + _values_impl.size());
+            std::copy(_keys_impl.data(), _keys_impl.data() + _keys_impl.size(), target.begin());
+            std::copy(_values_impl.data(), _values_impl.data() + _values_impl.size(), target.begin() + _keys_impl.size());
+        }
+
+        // map-like APIs
+
+        //TODO TODO
+
+        //TODO we need a reserve that will do a sort if we go above InitialExtent and do a sorted insert...
+
+        //TODO the rest of the API TODO TODO
 
     protected:
 
-        static constexpr const std::size_t required_byte_size(const std::size_t num_elems) {
-            return (K_Size + V_Size) * num_elems;
-        }
-
         void sync_views() {
-            this->reset_span(_impl.data(), _impl.size());
+            this->reset(_keys_impl, _values_impl);
         }
 
     private:
 
-        small_vector<std::byte> _impl; // We create a small vector optimised buffer.
+        small_range<byte_type, InitialExtent, K_Stride> _keys_impl; // We create a small vector optimised buffer, with no underlying step.
+        small_range<byte_type, InitialExtent, V_Stride> _values_impl;
 
     };
 
-} //ns common
+
+    template<typename ByteType = std::byte>
+    class heterogenous_record_view {
+
+    public:
+
+        using byte_type = ByteType;
+        using size_type = uint64_t;
+
+        //Fixme: allow this method to do packs for arbitrary size-types
+
+        //Builds a pack of ranges (spans, range_views, vectors etc.) into a small range, that can be a heterogenous record view.
+        template<typename... InputRanges>
+        constexpr static small_range<byte_type> build_heterogenous_range(InputRanges... i_ranges) {
+            static_assert(std::conjunction_v<std::is_convertible<typename InputRanges::value_type, byte_type>...>,
+                "InputRanges must have byte_type value_type's");
+            static_assert(sizeof(byte_type) == 1, "byte_type must be sizsof 1 - or it's not a byte type!");
+            auto o = small_range_view<byte_type>();
+            constexpr auto n_scalars_per_integer = std::max(uint64_t(1), uint64_t(sizeof(uint64_t) / sizeof(byte_type)));
+            constexpr auto record_header_size = n_scalars_per_integer * sizeof...(InputRanges) + 1;
+
+            // Reserve size by fold expression that should sum up the sizes of all the ranges
+            o.reserve(i_ranges.size() + ... + record_header_size);
+
+            // Add the header
+            //TODO TODO
+            //TODO check resize exists.
+            o.resize(sizeof...(InputRanges) * sizeof(size_type) + sizeof(byte_type));
+            unsigned int i = 0;
+            gt::pack_int(sizeof...(InputRanges), o.at_stride<sizeof(size_type)>(i++));
+            // Fold up the ranges and write their sizes into the output
+            (gt::pack_int(i_ranges.size(), o.at_stride<sizeof(size_type)>(i++)), ...);
+
+            // Add the actual data of each of the ranges... (using o.end() this time)
+            ((o.insert(o.end(), i_ranges.begin(), i_ranges.end())), ...);
+            return o;
+        }
+
+        //TODO begin and end need to be super simple iterators too...
+
+        //TODO span at
+
+    };
+
+} //ns gnt
+
+
+//TODO:
+//TODO for keys would be nice to have heterogenous_range_view
+
+//TODO span_tuple<type, Extent1, Extent2, Extent3>
+
+//TODO span_tuple_view<type, Extnet1, Extent2 etc.>
+//TODO problem: how can we construct from a range_view - how can we have dynamic extent over a view?
+//TODO better to have all the sizes at the beginning... but this has a flaw in that it messes up the ordering on the paths.
+//TODO we could have all the sizes at the end...
+
+//TODO of course the comparator makes it fine!!
+//TODO so absolutely no need to worry about that... mostly...
+//TODO I like the idea of a heterogenous_stride_view with the strides read off the beginning.
+//TODO we can then wrap iterators etc that way and underneath it should go to spans... which can then plug into other views...
+//TODO absolutely no chance of course of ever having such a thing dynamically but that should be fine

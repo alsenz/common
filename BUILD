@@ -25,6 +25,7 @@ cc_library(
     linkopts = COMMON_LINKOPTS,
     visibility = ["//visibility:public"],
     deps = COMMON_DEPS,
+    defines = ["span_FEATURE_COMPARISON", "span_FEATURE_SAME", "span_FEATURE_MEMBER_SWAP"]
 )
 
 cc_library(

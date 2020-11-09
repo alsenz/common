@@ -39,13 +39,13 @@ TEST(CommonSmallTests, PilferingAround2) {
 }
 
 TEST(CommonSmallTests, VectorSanityCheck) {
-    common::small_vector<char> vec;
+    common::small_range<char> vec;
     EXPECT_EQ(0, vec.size());
 }
 
 
 TEST(CommonSmallTests, MapSanityCheck) {
-    common::small_map<sizeof(uint64_t), sizeof(char)> smap;
+    common::small_byte_map<sizeof(uint64_t), sizeof(char)> smap;
     EXPECT_EQ(smap.begin(), smap.end());
     std::byte bytes[sizeof(uint64_t)];
     EXPECT_EQ(smap.find(bytes), smap.end());
