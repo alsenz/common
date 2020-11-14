@@ -1,7 +1,7 @@
 #include <vector>
 #include <iostream>
 
-#include "common/small.hpp"
+#include "common/small-vector.hpp"
 
 
 #include "gtest/gtest.h"

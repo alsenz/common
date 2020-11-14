@@ -22,10 +22,10 @@ namespace gnt {
         using const_reference = T const &;
 
         template<size_t N>
-        using stride = nonstd::span<T, N>;
+        using stride = gnt::stride<T, N>;
 
         template<size_t N>
-        using const_stride = const nonstd::span<T, N>;
+        using const_stride = const gnt::stride<T, N>;
 
         using size_type = std::size_t;
         using index_type = std::size_t;
@@ -160,17 +160,17 @@ namespace gnt {
         }
 
         template<size_t N>
-        constexpr stride<N> begin_stride() noexcept {
+        constexpr stride_iterator<N> begin_stride() noexcept {
             return stride_iterator<N>(begin());
         }
 
         template<size_t N>
-        constexpr const_stride<N> begin_stride() const noexcept {
+        constexpr const_stride_iterator<N> begin_stride() const noexcept {
             return stride_iterator<N>(begin());
         }
 
         template<size_t N>
-        constexpr const_stride<N> cbegin_stride() const noexcept {
+        constexpr const_stride_iterator<N> cbegin_stride() const noexcept {
             return stride_iterator<N>(cbegin());
         }
 
@@ -187,17 +187,17 @@ namespace gnt {
         }
 
         template<size_t N>
-        constexpr stride<N> end_stride() noexcept {
+        constexpr stride_iterator<N> end_stride() noexcept {
             return stride_iterator<N>(end());
         }
 
         template<size_t N>
-        constexpr const_stride<N> end_stride() const noexcept {
+        constexpr const_stride_iterator<N> end_stride() const noexcept {
             return stride_iterator<N>(end());
         }
 
         template<size_t N>
-        constexpr const_stride<N> cend_stride() const noexcept {
+        constexpr const_stride_iterator<N> cend_stride() const noexcept {
             return stride_iterator<N>(end());
         }
 

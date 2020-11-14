@@ -22,10 +22,13 @@ cc_library(
         "common/nonstd/span.hpp",
     ]),
     copts = COMMON_COPTS,
+    defines = [
+        "span_FEATURE_COMPARISON",
+        "span_FEATURE_SAME",
+    ],
     linkopts = COMMON_LINKOPTS,
     visibility = ["//visibility:public"],
     deps = COMMON_DEPS,
-    defines = ["span_FEATURE_COMPARISON", "span_FEATURE_SAME", "span_FEATURE_MEMBER_SWAP"]
 )
 
 cc_library(
