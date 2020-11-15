@@ -8,7 +8,7 @@
 #include "common/optional-inspect.hpp"
 #include "common/nonstd/span.hpp"
 
-namespace gt {
+namespace gnt {
 
     //TODO: alternate route for packing double:
     //TODO: write the number of significant bits (from right, + some decimal precision). This goes into 1 int.
@@ -38,4 +38,4 @@ namespace gt {
 
 
 
-} //ns gt
+} //ns gnt

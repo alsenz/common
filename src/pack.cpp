@@ -1,6 +1,6 @@
-#include "gandt/pack.hpp"
+#include "common/pack.hpp"
 
-namespace gt {
+namespace gnt {
 
     void pack_int(uint64_t i, nonstd::span<char> target) {
         target[0] = (i >> 56) & 0xFF;
@@ -85,4 +85,4 @@ namespace gt {
         pack_int(u.ab, sv.subspan(0, 8));
         pack_int(u.cd, sv.subspan(8, 8));
     }
-} //ns gt
+} //ns gnt

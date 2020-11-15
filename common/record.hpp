@@ -1,74 +1,66 @@
 #pragma once
 
 #include <cstddef>
+#include <algorithm>
+#include <array>
 
 #include "vector-view.hpp"
 #include "small-vector.hpp"
+#include "pack.hpp"
 
 namespace gnt {
 
+    //Fixme: don't use size_t here - use a fixed width integer type for forward compatibility reasons!
 
-    //TODO the NFields needs to be constant... for sure... we'll always know how many fields we have!
+    template<size_t N, typename ByteType = std::byte>
+    using record_view = std::array<nonstd::span<ByteType>, N>;
 
-    template<typename ByteType = std::byte>
-    class heterogenous_record_view {
+    template<typename ByteType, size_t N>
+    constexpr small_vector<ByteType> make_vector(const record_view<N, ByteType> &rv) {
+        const std::size_t total_bytes = std::accumulate(rv.begin(), rv.end(), (std::size_t) 0,
+            [](std::size_t acc, auto spn){
+            return acc + spn;
+        });
+        //Header: TOTAL_FIELDS, FIELD_SIZES..., FIELD BYTES (CONTIGUOUS)
+        const std::size_t header_bytes = sizeof(std::size_t) + sizeof(std::size_t) * N;
+        const std::size_t total_bytes_with_header = header_bytes + total_bytes;
+        auto result = small_vector<ByteType>(total_bytes_with_header); //Small vector does resize with this ctor, not fill
+        // So we will here:
+        result.resize(total_bytes_with_header);
 
-    public:
-
-        using byte_type = ByteType;
-        using size_type = uint64_t;
-
-        //Fixme: allow this method to do packs for arbitrary size-types
-
-        //Builds a pack of ranges (spans, range_views, vectors etc.) into a small range, that can be a heterogenous record view.
-        template<typename... InputRanges>
-        constexpr static small_vector<byte_type> build_heterogenous_range(InputRanges... i_ranges) {
-            static_assert(std::conjunction_v<std::is_convertible<typename InputRanges::value_type, byte_type>...>,
-            "InputRanges must have byte_type value_type's");
-            static_assert(sizeof(byte_type) == 1, "byte_type must be sizsof 1 - or it's not a byte type!");
-            auto o = small_vector<byte_type>();
-            constexpr auto n_scalars_per_integer = std::max(uint64_t(1), uint64_t(sizeof(uint64_t) / sizeof(byte_type)));
-            constexpr auto record_header_size = n_scalars_per_integer * sizeof...(InputRanges) + 1;
-
-            // Reserve size by fold expression that should sum up the sizes of all the ranges
-            o.reserve(i_ranges.size() + ... + record_header_size);
-
-            // Add the header
-            //TODO TODO
-            //TODO check resize exists.
-            o.resize(sizeof...(InputRanges) * sizeof(size_type) + sizeof(byte_type));
-            unsigned int i = 0;
-            gt::pack_int(sizeof...(InputRanges), o.at_stride<sizeof(size_type)>(i++));
-            // Fold up the ranges and write their sizes into the output
-            (gt::pack_int(i_ranges.size(), o.at_stride<sizeof(size_type)>(i++)), ...);
-
-            // Add the actual data of each of the ranges... (using o.end() this time)
-            ((o.insert(o.end(), i_ranges.begin(), i_ranges.end())), ...);
-            return o;
+        // Now let's add the first uint64 - the number of fields
+        gnt::pack_int(rv.size(), result.at_stride<sizeof(std::size_t)>(0));
+        // Then let's pack each of the sizes, followed by each of the
+        uint64_t accum = header_bytes;
+        for(uint64_t i = 0; i < rv.size(); ++i) {
+            const auto &spn = rv.at(i);
+            const auto ith_sz = spn.size();
+            gnt::pack_int(ith_sz, result.at_stride<sizeof(std::size_t)>(i+1));
+            // Accum should be pointing at the first byte of the next field- so we should be able to just copy over
+            std::copy(spn.begin(), spn.end(), result.begin() + accum);
+            accum += ith_sz;
         }
 
-        //TODO begin and end need to be super simple iterators too...
+        return result;
+    }
 
-        //TODO span at
-
-    };
-
-
-
-//TODO:
-//TODO for keys would be nice to have heterogenous_range_view
-
-//TODO span_tuple<type, Extent1, Extent2, Extent3>
-
-//TODO span_tuple_view<type, Extnet1, Extent2 etc.>
-//TODO problem: how can we construct from a range_view - how can we have dynamic extent over a view?
-//TODO better to have all the sizes at the beginning... but this has a flaw in that it messes up the ordering on the paths.
-//TODO we could have all the sizes at the end...
-
-//TODO of course the comparator makes it fine!!
-//TODO so absolutely no need to worry about that... mostly...
-//TODO I like the idea of a heterogenous_stride_view with the strides read off the beginning.
-//TODO we can then wrap iterators etc that way and underneath it should go to spans... which can then plug into other views...
-//TODO absolutely no chance of course of ever having such a thing dynamically but that should be fine
+    template<size_t N, size_t Extent, typename ByteType = std::byte>
+    constexpr const record_view<N, ByteType> make_record_view(const vector_view<ByteType, Extent> &record_bytes) {
+        const std::size_t size_check = gnt::unpack_int(record_bytes.at_stride<sizeof(std::size_t)>(0));
+        if(size_check != N) {
+            throw std::logic_error("make_record_view underlying field does not have exactly N fields");
+        }
+        auto result = record_view<N, ByteType>();
+        const std::size_t header_bytes = sizeof(std::size_t) + sizeof(std::size_t) * N;
+        auto accum = header_bytes;
+        for(std::size_t i = 0; i < N; ++i) {
+            const auto field_size = gnt::unpack_int(record_bytes.at_stride<sizeof(std::size_t)>(i + 1));
+            const auto start_it = record_bytes.begin() + accum;
+            const auto end_it = start_it + field_size;
+            result.at(i) = nonstd::span<ByteType>(start_it, end_it);
+            accum += field_size;
+        }
+        return result;
+    }
 
 } //ns gnt
