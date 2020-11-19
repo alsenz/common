@@ -63,9 +63,6 @@ namespace gnt {
         template<size_t N>
         vector_view(std::array<T, N> &spn) : vector_view(spn.data(), spn.size()) {}
 
-
-    protected:
-
         template<size_t Extent2 = Extent>
         void reset(nonstd::span<T, Extent2> &&spn) {
             _impl = std::move(spn);
@@ -76,7 +73,7 @@ namespace gnt {
             _impl = spn;
         }
 
-        void reset(T *const ptr, std::size_t size) {
+        void reset(T *ptr, std::size_t size) {
             _impl = nonstd::span<T>(ptr, size);
         }
 

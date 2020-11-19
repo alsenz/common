@@ -40,18 +40,19 @@ namespace gnt {
         using typename vector_view<T>::reference;
         using typename vector_view<T>::value_type;
 
-        //TODO use these types throughout!
         using heap_vector = std::vector<T>;
         using stack_vector = gnt::stack_vector<T, StackExtent>;
         using vector_variant = std::variant<stack_vector, heap_vector>;
 
         //Warning: notice the change of API - reserve not fill!
         small_vector(size_type reserve_cap) : _impl(make_impl_with_reserve(reserve_cap)) {
-            sync();
+            //TODO try to put this back to sync()
+            std::visit([this](auto &vec) { vector_view<T>::reset(vec.data(), vec.size()); }, _impl);
         }
 
         small_vector() : _impl(stack_vector()) {
-            sync();
+            //TODO check if this is enough...
+            std::visit([this](auto &vec) { vector_view<T>::reset(vec.data(), vec.size()); }, _impl);
         }
 
     private:
@@ -67,7 +68,7 @@ namespace gnt {
 
         // Ensures the view base class has exactly what the variant has below
         void sync() {
-            std::visit([this](const auto &vec) { this->reset(vec.data(), vec.size()); }, _impl);
+            std::visit([this](auto &vec) { this->reset(vec.data(), vec.size()); }, _impl);
         }
 
         template<typename Visitor>

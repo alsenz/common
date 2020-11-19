@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "common/small-vector.hpp"
+#include "common/small-byte-map.hpp"
 
 
 #include "gtest/gtest.h"
@@ -39,13 +40,13 @@ TEST(CommonSmallTests, PilferingAround2) {
 }
 
 TEST(CommonSmallTests, VectorSanityCheck) {
-    common::small_range<char> vec;
+    gnt::small_vector<char> vec;
     EXPECT_EQ(0, vec.size());
 }
 
 
 TEST(CommonSmallTests, MapSanityCheck) {
-    common::small_byte_map<sizeof(uint64_t), sizeof(char)> smap;
+    gnt::small_byte_map<sizeof(uint64_t), sizeof(char)> smap;
     EXPECT_EQ(smap.begin(), smap.end());
     std::byte bytes[sizeof(uint64_t)];
     EXPECT_EQ(smap.find(bytes), smap.end());

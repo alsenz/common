@@ -16,7 +16,7 @@ namespace gnt {
      * ... to store 128 bytes, or 32 uint64_t's.
      */
     template<typename T, size_t Extent = (128 / sizeof(T)) + 1>
-    class stack_vector : vector_view<T> {
+    class stack_vector : public vector_view<T> {
 
     public:
 
@@ -24,7 +24,6 @@ namespace gnt {
         using typename vector_view<T>::iterator;
         using typename vector_view<T>::const_iterator;
         using typename vector_view<T>::reference;
-        using typename vector_view<T>::element_type;
         using typename vector_view<T>::value_type;
 
         stack_vector() : _impl(), _count(0) {}

@@ -160,16 +160,16 @@ namespace gnt {
             return build_from_contiguous_bytes(cont.data(), cont.size(), sorted_hint);
         }
 
-        small_byte_map_view(bool linear_mode = true) : _keys(), _values(), _linear_mode(linear_mode) {}
+        small_byte_map_view(bool linear_mode = true) : _linear_mode(linear_mode), _keys(), _values() {}
 
         small_byte_map_view(byte_type *k_ptr, byte_type *v_ptr, size_type num_elems, bool sorted_hint = false)
-            : _keys(k_ptr, num_elems * K_Extent), _values(v_ptr, num_elems * V_Extent), _linear_mode(false) {
+            : _linear_mode(false), _keys(k_ptr, num_elems * K_Extent), _values(v_ptr, num_elems * V_Extent) {
             infer_mode(sorted_hint);
         }
 
         template<size_type Extent>
         small_byte_map_view(nonstd::span<byte_type, Extent> key_spn, nonstd::span<byte_type, Extent> value_spn, bool sorted_hint = false)
-            : _keys(key_spn), _values(value_spn), _linear_mode(false) {
+            : _linear_mode(false), _keys(key_spn), _values(value_spn) {
             infer_mode(sorted_hint);
         }
 
@@ -267,7 +267,7 @@ namespace gnt {
             }
             return iterator(
                 _keys.template begin_stride<K_Extent>().to_span(),
-                _values.template begin_stride<V_Extent>()().to_span()
+                _values.template begin_stride<V_Extent>().to_span()
             );
         }
 
@@ -278,7 +278,7 @@ namespace gnt {
             // Note this always assumes that the key and value iterators have steps.
             return const_iterator(
                 _keys.template begin_stride<K_Extent>().to_span(),
-                _values.template begin_stride<V_Extent>()().to_span()
+                _values.template begin_stride<V_Extent>().to_span()
             );
         }
 
@@ -289,7 +289,7 @@ namespace gnt {
             // Note this always assumes that the key and value iterators have steps.
             return const_iterator(
                 _keys.template cbegin_stride<K_Extent>().to_span(),
-                _values.template cbegin_stride<V_Extent>()().to_span()
+                _values.template cbegin_stride<V_Extent>().to_span()
             );
         }
 
@@ -302,7 +302,7 @@ namespace gnt {
             // Note this always assumes that the key and value iterators have steps.
             return iterator(
                 _keys.template end_stride<K_Extent>().to_span(), // Note: this should be safe since the pointer is never de-reffed
-                _values.template end_stride<V_Extent>()().to_span()
+                _values.template end_stride<V_Extent>().to_span()
             );
         }
 
@@ -313,7 +313,7 @@ namespace gnt {
             // Note this always assumes that the key and value iterators have steps.
             return const_iterator(
                 _keys.template end_stride<K_Extent>().to_span(), // Note: this should be safe since the pointer is never de-reffed
-                _values.template end_stride<V_Extent>()().to_span()
+                _values.template end_stride<V_Extent>().to_span()
             );
         }
 
@@ -324,7 +324,7 @@ namespace gnt {
             // Note this always assumes that the key and value iterators have steps.
             return const_iterator(
                 _keys.template cend_stride<K_Extent>().to_span(), // Note: this should be safe since the pointer is never de-reffed
-                _values.template cend_stride<V_Extent>()().to_span()
+                _values.template cend_stride<V_Extent>().to_span()
             );
         }
 
@@ -422,11 +422,15 @@ namespace gnt {
 
         // Construct with a reserve in *number of elements* (not byte size)!
         small_byte_map(std::size_t reserve_num_entries) : _keys_impl(reserve_num_entries * K_Extent), _values_impl(reserve_num_entries * V_Extent) {
-            sync();
+            //TODO may not work == try putting this back
+            //sync();
+            super::reset(_keys_impl, _values_impl);
         }
 
         small_byte_map() : _keys_impl(), _values_impl() {
-            sync();
+            //TODO may not work -- try putting this back
+            //sync();
+            super::reset(_keys_impl, _values_impl);
         }
 
         //Fixme: some copy constructors

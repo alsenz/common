@@ -113,12 +113,15 @@ namespace gnt {
             return (p_data - other.p_data) / Stride;
         }
 
+        //TODO no this is not how you compare iterators!
+        //TODO or we break end()
+
         bool operator== (const stride_iterator<T, Stride> &other) const {
-            return to_span() == other.to_span();
+            return p_data == other.p_data;
         }
 
         bool operator!= (const stride_iterator<T, Stride> &other) const {
-            return to_span() != other.to_span();
+            return p_data != other.p_data;
         }
 
         pointer p_data;
