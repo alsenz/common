@@ -9,26 +9,34 @@
 #include "common/virtual-handler.hpp"
 #include "common/reducer-mixin.hpp"
 #include "common/logger.hpp"
+#include "common/handles.hpp"
 
 namespace caf {
 
     // The idea here is to provide an actor base class which automatically sets up virtual handle(...) member functions for behaviours given a type signature
 
-    namespace detail2 { //TODO change this to detail when event-handler.hpp is deprected.
+    namespace detail2 { //TODO change this to detail when event-handler.hpp is deprecated.
 
         template<typename T>
         struct behaviors_to_handler;
 
-        template<typename O, typename... Is>
-        struct behaviors_to_handler<caf::result<O>(Is...)> {
+        template<typename... Os, typename... Is>
+        struct behaviors_to_handler<caf::result<Os...>(Is...)> {
             template<typename T>
             auto operator()(T *thiz) {
-                return [thiz](Is... args) -> caf::result<O> {
-                    //TODO: remove this log... at least put it in a switch
-                    std::stringstream ss;
-                    ss << "Handling event with result. This type: " << typeid(T).name() << ", result type: "
-                       << typeid(O).name() << ", args tuple: " << typeid(std::tuple<Is...>).name();
-                    as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
+                return [thiz](Is... args) -> detail::first_pack_type_t<Os...> {
+                    //as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
+                    return thiz->handle(std::forward<Is>(args)...);
+                };
+            }
+        };
+
+        template<typename... Os, typename... Is>
+        struct behaviors_to_handler<opaque_result<Os...>(Is...)> {
+            template<typename T>
+            auto operator()(T *thiz) {
+                return [thiz](Is... args) -> caf::result<detail::first_pack_type_t<Os...>> {
+                    //as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
                     return thiz->handle(std::forward<Is>(args)...);
                 };
             }
@@ -40,11 +48,6 @@ namespace caf {
             template<typename T>
             auto operator()(T *thiz) {
                 return [thiz](Is... args) -> void {
-                    //TODO: remove this log... at least put it in a switch
-                    std::stringstream ss;
-                    ss << "Handling event with no result (void)! This type: " << typeid(T).name() << ", args tuple: "
-                       << typeid(std::tuple<Is...>).name();
-                    as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
                     thiz->handle(std::forward<Is>(args)...);
                 };
             }
@@ -52,14 +55,42 @@ namespace caf {
 
     }
 
+
+    template<typename... Sigs>
+    class typed_handler_actor;
+
+    namespace detail {
+
+        template<typename... Ts>
+        struct strip_opaque;
+
+        template<typename... Os, typename... Is>
+        struct strip_opaque<result<Os...>(Is...)> {
+            using type = result<Os...>(Is...);
+        };
+
+        template<typename... Os, typename... Is>
+        struct strip_opaque<opaque_result<Os...>(Is...)> {
+            using type = result<Os...>(Is...);
+        };
+
+        template<typename... Ts>
+        using strip_opaque_t = typename strip_opaque<Ts...>::type;
+
+        template<typename... Sigs>
+        using typed_handler_actor_base = mixin::reducer<typename typed_actor<strip_opaque_t<Sigs>...>::base, typed_handler_actor<Sigs...>>;
+
+    } //ns detail
+
     template<typename... Sigs>
     class typed_handler_actor
-        : public mixin::reducer<typename typed_actor<Sigs...>::base, typed_handler_actor<Sigs...>>, //Add the reducer mixin for convenience
+    : public detail::typed_handler_actor_base<Sigs...>, //Add the reducer mixin for convenience
           public handler_base<Sigs...> {
 
     public:
 
-        using super = typename mixin::reducer<typename typed_actor<Sigs...>::base, typed_handler_actor<Sigs...>>;
+        //using super = typename mixin::reducer<typename typed_actor<Sigs...>::base, typed_handler_actor<Sigs...>>;
+        using super = detail::typed_handler_actor_base<Sigs...>;
 
         template<typename SingleClause>
         friend class detail2::behaviors_to_handler;

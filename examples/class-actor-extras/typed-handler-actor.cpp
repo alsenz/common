@@ -5,7 +5,6 @@
 #include "caf/all.hpp"
 #include "caf/io/all.hpp"
 
-#include "common/virtual-handler.hpp"
 #include "common/typed-handler-actor.hpp"
 #include "common/handles.hpp"
 #include "common/config.hpp"
@@ -16,14 +15,22 @@ struct event_26 {
     char data;
 };
 
+struct event_42 {
+    using result_t = float;
+    int data;
+};
+
 CAF_BEGIN_TYPE_ID_BLOCK(example_typed_handler_actor, gt::common::custom_type_block_end + 50)
     CAF_ADD_TYPE_ID(example_typed_handler_actor, (event_26))
+    CAF_ADD_TYPE_ID(example_typed_handler_actor, (event_42))
 CAF_END_TYPE_ID_BLOCK(example_typed_handler_actor)
 
 class test_class_actor : public caf::typed_handler_actor<
     caf::reacts_to<std::string>,
     caf::replies_to<float>::with<bool>,
-    caf::handles<event_26>
+    caf::handles<event_26>,
+    caf::replies_posthoc_to<int>::with<std::string>,
+    caf::handles_posthoc<event_42>
     > {
 
 public:
@@ -31,7 +38,10 @@ public:
     using super = caf::typed_handler_actor<
         caf::reacts_to<std::string>,
         caf::replies_to<float>::with<bool>,
-        caf::handles<event_26>>;
+        caf::handles<event_26>,
+        caf::replies_posthoc_to<int>::with<std::string>,
+        caf::handles_posthoc<event_42>
+        >;
 
     test_class_actor(caf::actor_config &cfg) : super(cfg) {}
 
@@ -39,12 +49,20 @@ public:
         std::cout << "Handling string argument " << arg << std::endl;
     }
 
-    virtual caf::result<bool> handle(const float &f) override {
+    virtual bool handle(const float &f) override {
         return false;
     }
 
-    virtual caf::result<event_26::result_t> handle(const event_26 &e) override {
+    virtual event_26::result_t handle(const event_26 &e) override {
         return 42;
+    }
+
+    virtual caf::result<std::string> handle(const int &i) override {
+        return std::string("abc");
+    }
+
+    virtual caf::result<event_42::result_t> handle(const event_42 &e) override {
+        return 123.456;
     }
 
 };

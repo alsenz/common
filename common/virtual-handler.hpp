@@ -8,6 +8,8 @@
 
 namespace caf {
 
+    //TODO do some traits to ensure the forwarding is sensible here... e.g. scalars should be by value.
+
     namespace detail {
 
         // If everything is void it's also void, otherwise caf::result<Out...>
@@ -18,6 +20,14 @@ namespace caf {
             caf::result<Out...>
         >;
 
+        template<typename T, typename... Ts>
+        struct first_pack_type {
+            using type = T;
+        };
+
+        template<typename... Ts>
+        using first_pack_type_t = typename first_pack_type<Ts...>::type;
+
     }
 
     // A simple base class that adds virtual const-ref handle(...) methods corresponding to each signature
@@ -26,6 +36,13 @@ namespace caf {
 
     template<class... Out, class... In>
     struct handler_base<result<Out...>(In...)> {
+
+        virtual detail::first_pack_type_t<Out...> handle(const In &...) = 0; //TODO: handle forwarding correctly here
+
+    };
+
+    template<class... Out, class... In>
+    struct handler_base<opaque_result<Out...>(In...)> {
 
         virtual detail::result_or_void_t<Out...> handle(const In &...) = 0; //TODO: handle forwarding correctly here
 
@@ -36,9 +53,20 @@ namespace caf {
 
         using handler_base<Sigs...>::handle;
 
+        virtual detail::first_pack_type_t<Out...> handle(const In &...) = 0; //TODO handle forwarding correctly here
+
+    };
+
+    template<class... Sigs, class... Out, class... In>
+    struct handler_base<opaque_result<Out...>(In...), Sigs...> : handler_base<Sigs...> {
+
+        using handler_base<Sigs...>::handle;
+
         virtual detail::result_or_void_t<Out...> handle(const In &...) = 0; //TODO handle forwarding correctly here
 
     };
+
+
 
 }
 
@@ -46,6 +74,7 @@ namespace caf {
 
 //TODO TODO
 //TODO stuff in here is deprecated
+//TODO remove this when event-handler is deprecated.
 namespace as {
 
 
