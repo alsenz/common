@@ -3,6 +3,7 @@
 #include <type_traits>
 #include <sstream>
 #include <tuple>
+#include <iostream>
 
 #include "caf/all.hpp"
 
@@ -24,9 +25,16 @@ namespace caf {
         struct behaviors_to_handler<caf::result<Os...>(Is...)> {
             template<typename T>
             auto operator()(T *thiz) {
-                return [thiz](Is... args) -> detail::first_pack_type_t<Os...> {
+                return [thiz](const Is &... args) -> detail::first_pack_type_t<Os...> {
+                    std::cout << "A 1" << std::endl;
+                    std::cout << typeid(caf::result<Os...>).name() << std::endl;
+                    std::cout << typeid(caf::result<void>).name() << std::endl;
+                    std::cout << typeid(caf::result<int>).name() << std::endl;
                     //as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
-                    return thiz->handle(std::forward<Is>(args)...);
+                    //auto res = thiz->handle(std::forward<Is>(args)...);
+                    auto res = thiz->handle(args...);
+                    std::cout << "A 2" << std::endl;
+                    return res;
                 };
             }
         };
@@ -37,7 +45,10 @@ namespace caf {
             auto operator()(T *thiz) {
                 return [thiz](Is... args) -> caf::result<detail::first_pack_type_t<Os...>> {
                     //as::common::logger::trace_a(thiz, ss.str(), "event-handler", __FUNCTION__, __LINE__, __FILE__);
-                    return thiz->handle(std::forward<Is>(args)...);
+                    std::cout << "B 1" << std::endl;
+                    auto res = thiz->handle(std::forward<Is>(args)...);
+                    std::cout << "B 2" << std::endl;
+                    return res;
                 };
             }
         };
@@ -48,7 +59,9 @@ namespace caf {
             template<typename T>
             auto operator()(T *thiz) {
                 return [thiz](Is... args) -> void {
+                    std::cout << "C 1" << std::endl;
                     thiz->handle(std::forward<Is>(args)...);
+                    std::cout << "C 2" << std::endl;
                 };
             }
         };

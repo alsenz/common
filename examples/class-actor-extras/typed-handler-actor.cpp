@@ -10,6 +10,8 @@
 #include "common/config.hpp"
 #include "common/common-typeids.hpp"
 
+//TODO I think these guys need an inspector!
+
 struct event_26 {
     using result_t = int;
     char data;
@@ -20,13 +22,25 @@ struct event_42 {
     int data;
 };
 
-CAF_BEGIN_TYPE_ID_BLOCK(example_typed_handler_actor, gt::common::custom_type_block_end + 50)
-    CAF_ADD_TYPE_ID(example_typed_handler_actor, (event_26))
-    CAF_ADD_TYPE_ID(example_typed_handler_actor, (event_42))
-CAF_END_TYPE_ID_BLOCK(example_typed_handler_actor)
+template <class Inspector>
+typename Inspector::result_type inspect(Inspector &f, event_26 &x) {
+    return f(caf::meta::type_name("event_26"), x.data);
+}
+
+template <class Inspector>
+typename Inspector::result_type inspect(Inspector &f, event_42 &x) {
+    return f(caf::meta::type_name("event_42"), x.data);
+}
+
+//TODO question - do we need this given as the type has a name in the inspector? TODO
+//TODO perhaps replace this with calling config
+CAF_BEGIN_TYPE_ID_BLOCK(example_typed_handler_actor_types, gt::common::custom_type_block_end + 50)
+    CAF_ADD_TYPE_ID(example_typed_handler_actor_types, (event_26))
+    CAF_ADD_TYPE_ID(example_typed_handler_actor_types, (event_42))
+CAF_END_TYPE_ID_BLOCK(example_typed_handler_actor_types)
 
 class test_class_actor : public caf::typed_handler_actor<
-    caf::reacts_to<std::string>,
+    caf::handles<std::string>,
     caf::replies_to<float>::with<bool>,
     caf::handles<event_26>,
     caf::replies_posthoc_to<int>::with<std::string>,
@@ -71,13 +85,17 @@ public:
 
 auto main(int argc, char** argv) -> int {
 
+    //TODO where are the custom types coming out here?
+
     as::config<> cfg;
     cfg.load<caf::io::middleman>();
+    //cfg.add_message_types<caf::id_block::example_typed_handler_actor_types>();
     auto err = cfg.parse(argc, argv, "/etc/gandt.ini");
     if(cfg.cli_helptext_printed) {
         return 0; //We're done.b
     }
 
+    caf::exec_main_init_meta_objects<caf::id_block::example_typed_handler_actor_types>();
     caf::core::init_global_meta_objects();
     caf::io::middleman::init_global_meta_objects();
     caf::actor_system system{cfg};
@@ -92,7 +110,9 @@ auto main(int argc, char** argv) -> int {
     std::cout << "Result of a float is: " << (test_actor_fn((float) 43.24) ? "true" : "flase") << std::endl;
     std::cout << "Handling string arg..." << std::endl;
     test_actor_fn(std::string("hello there"));
-    auto code = test_actor_fn(event_26{'a'}).value();
+    std::cout << "Handling handles with event...." << std::endl;
+    auto evt = event_26{'a'};
+    auto code = test_actor_fn(evt).value();
     std::cout << "Code from event: " << code << std::endl;
 
     return 0;
