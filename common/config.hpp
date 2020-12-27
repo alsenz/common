@@ -3,14 +3,21 @@
 #include <tuple>
 #include <string>
 #include <stdexcept>
+#include <type_traits>
 
 #include "caf/actor_system_config.hpp"
+#include "caf/all.hpp"
+#include "caf/io/all.hpp"
 
 #include "common/logger.hpp"
+#include "automatic-typeids.hpp"
 
 namespace as {
 
     using config_group = caf::actor_system_config::opt_group;
+
+    //Configurables is a concept that has .configure(...)
+    //and has a tuple<T...> called message_types which need to be inited.
 
     //Config that calls a static method on Configurables to add custom option groups
     template<typename...Configurables>
@@ -59,7 +66,42 @@ namespace as {
             return caf::actor_system_config::remainder.at(idx);
         }
 
+        static void init_meta_objects() {
+            caf::core::init_global_meta_objects();
+            caf::io::middleman::init_global_meta_objects();
+            init_meta_objects_impl<Configurables...>();
+        }
+
     private:
+
+        template<typename HeadConfig, typename NextConfig, typename... TailConfigs>
+        static void init_meta_objects_impl() {
+            init_meta_objects_impl<HeadConfig>();
+            init_meta_objects_impl<NextConfig, TailConfigs...>();
+        }
+
+        template<typename Config>
+        static auto init_meta_objects_impl() -> decltype(typename Config::message_types(), void()) {
+            std::cout << "halleee" << std::endl;
+            init_meta_objects_impl(typename Config::message_types());
+        }
+
+        template<typename Config>
+        static void init_meta_objects_impl()  {
+            std::cout << "nooo" << std::endl;
+            //No-op
+        }
+
+        template<typename T, typename Next, typename... Ts>
+        static void init_meta_objects_impl(std::tuple<T, Next, Ts...>) {
+            init_meta_objects_impl(std::tuple<T>());
+            init_meta_objects_impl(std::tuple<Next, Ts...>());
+        }
+
+        template<typename T>
+        static void init_meta_objects_impl(std::tuple<T>) {
+            gnt::grain::init_caf_type<T>();
+        }
 
         //Just apply to each one
         template<typename HeadConfig, typename NextConfig, typename... TailConfigs>
@@ -70,6 +112,8 @@ namespace as {
 
         template<typename Config>
         void apply_custom_options(caf::config_option_set &custom_options) {
+            //TODO only call this if the method exists...
+            //TODO TODO
             Config &option_struct = std::get<Config>(_config_variants);
             config_group option_group = opt_group(custom_options, option_struct.group_name());
             option_struct.configure(option_group);

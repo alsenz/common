@@ -8,36 +8,31 @@
 #include "common/typed-handler-actor.hpp"
 #include "common/handles.hpp"
 #include "common/config.hpp"
-#include "common/common-typeids.hpp"
-
-//TODO I think these guys need an inspector!
+#include "common/automatic-typeids.hpp"
 
 struct event_26 {
     using result_t = int;
     char data;
 };
 
-struct event_42 {
-    using result_t = float;
-    int data;
-};
+ENABLE_CAF_TYPE(event_26);
 
 template <class Inspector>
 typename Inspector::result_type inspect(Inspector &f, event_26 &x) {
     return f(caf::meta::type_name("event_26"), x.data);
 }
 
+struct event_42 {
+    using result_t = float;
+    int data;
+};
+
+ENABLE_CAF_TYPE(event_42);
+
 template <class Inspector>
 typename Inspector::result_type inspect(Inspector &f, event_42 &x) {
     return f(caf::meta::type_name("event_42"), x.data);
 }
-
-//TODO question - do we need this given as the type has a name in the inspector? TODO
-//TODO perhaps replace this with calling config
-CAF_BEGIN_TYPE_ID_BLOCK(example_typed_handler_actor_types, gt::common::custom_type_block_end + 50)
-    CAF_ADD_TYPE_ID(example_typed_handler_actor_types, (event_26))
-    CAF_ADD_TYPE_ID(example_typed_handler_actor_types, (event_42))
-CAF_END_TYPE_ID_BLOCK(example_typed_handler_actor_types)
 
 class test_class_actor : public caf::typed_handler_actor<
     caf::handles<std::string>,
@@ -56,6 +51,22 @@ public:
         caf::replies_posthoc_to<int>::with<std::string>,
         caf::handles_posthoc<event_42>
         >;
+
+    struct config {
+
+        using message_types = std::tuple<event_26, event_42>;
+
+        //TODO make this removable
+        void configure(as::config_group &group) {
+            //Nothing
+        }
+
+        //TODO make this removable
+        constexpr const char *group_name() const {
+            return "todo-remove";
+        }
+
+    };
 
     test_class_actor(caf::actor_config &cfg) : super(cfg) {}
 
@@ -85,19 +96,14 @@ public:
 
 auto main(int argc, char** argv) -> int {
 
-    //TODO where are the custom types coming out here?
-
-    as::config<> cfg;
-    cfg.load<caf::io::middleman>();
-    //cfg.add_message_types<caf::id_block::example_typed_handler_actor_types>();
+    as::config<test_class_actor::config> cfg;
+    cfg.load<caf::io::middleman>(); //TODO make this work without stuff to config..
+    cfg.init_meta_objects();
     auto err = cfg.parse(argc, argv, "/etc/gandt.ini");
     if(cfg.cli_helptext_printed) {
         return 0; //We're done.b
     }
 
-    caf::exec_main_init_meta_objects<caf::id_block::example_typed_handler_actor_types>();
-    caf::core::init_global_meta_objects();
-    caf::io::middleman::init_global_meta_objects();
     caf::actor_system system{cfg};
     if(err) {
         std::cerr << caf::to_string(err) << std::endl;
